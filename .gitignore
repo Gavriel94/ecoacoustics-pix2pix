@@ -1,5 +1,7 @@
 .venv
 .pytest_cache
-docs/
+docs/notes.md
+docs/thoughts.md
+docs/todo.md
 data/
 .DS_Store
