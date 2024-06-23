@@ -5,3 +5,5 @@ docs/thoughts.md
 docs/todo.md
 data/
 .DS_Store
+__pychache__
+*.pyc
