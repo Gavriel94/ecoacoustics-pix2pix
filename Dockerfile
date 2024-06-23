@@ -1,6 +1,5 @@
 FROM python:3.11
 
-
 RUN mkdir /app
 WORKDIR /app
 
@@ -10,6 +9,7 @@ RUN pip install --upgrade pip \
 && pip install -r requirements.txt \
 && pip install -r requirements-dev.txt
 
+# Send stdout/stderr streams to terminal (see logs in real time) 
 ENV PYTHONUNBUFFERED 1
 
 EXPOSE 8000
