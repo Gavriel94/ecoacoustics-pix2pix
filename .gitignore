@@ -1,6 +1,6 @@
 .venv
 .pytest_cache
-docs/Notes
+docs
 data/
 .DS_Store
 __pychache__
