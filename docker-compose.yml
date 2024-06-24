@@ -11,3 +11,10 @@ services:
     image: mic_inf:latest
     volumes:
       - .:/app
+
+  analysis:
+      build: .
+      command: python /app/audio_analysis.py
+      image: mic_inf:latest
+      volumes:
+        - .:/app
