@@ -3,6 +3,62 @@ import shutil
 import os
 
 
+def create_summary(dir_path: str):
+    """
+    Creates a summary file based on the WAV file names.
+
+    Args:
+        dir_path (str): Directory containing WAV files.
+    """
+    folder, year, mic, location = dir_path.split('/')
+    dest_path = folder + '/' + year + '/' + mic + '/' + 'summaries'
+    if not os.path.exists(dest_path):
+        os.mkdir(dest_path)
+    files = os.listdir(dir_path)
+    files.sort()
+    months = {
+        '01': 'Jan',
+        '02': 'Feb',
+        '03': 'Mar',
+        '04': 'Apr',
+        '05': 'May',
+        '06': 'Jun',
+        '07': 'Jul',
+        '08': 'Aug',
+        '09': 'Sep',
+        '10': 'Oct',
+        '11': 'Nov',
+        '12': 'Dec'
+    }
+    dic = {
+        'DATE': [],
+        'TIME': []
+    }
+    first_last_date = []
+    for i, file in enumerate(files):
+        _, date, time = file.split('_')
+        year = date[:4]
+        month = date[4:6]
+        day = date[6:8]
+        hours = time[:2]
+        mins = time[2:4]
+        secs = time[4:6]
+        out_date = year + '-' + months[month] + '-' + day
+        out_time = hours + ':' + mins + ':' + secs
+        dic['DATE'].append(out_date)
+        dic['TIME'].append(out_time)
+        if i == 0:
+            d = year + month + day
+            first_last_date.append(d)
+        elif i == len(files)-1:
+            d = year + month + day
+            first_last_date.append(d)
+    df = pd.DataFrame(dic)
+    dest_path = (dest_path + '/' + location + '_Summary_' + first_last_date[0]
+                 + '_' + first_last_date[1] + '.txt')
+    df.to_csv(dest_path, index=False)
+
+
 def find_matches(sm4_summary_path: str,
                  smmicro_summary_path: str,
                  save_path: str = None):
@@ -99,3 +155,6 @@ print(f'2024_03 PLI1 data samples: {len_pli1}')
 print(f'2024_03 PLI2 data samples: {len_pli2}')
 print(f'2024_03 PLI3 data samples: {len_pli3}')
 print('Total 2024 samples:', len_pli1 + len_pli2 + len_pli3)
+
+create_summary('data/2023_11/SM4/PLI2')
+create_summary('data/2023_11/SM4/PLI3')
