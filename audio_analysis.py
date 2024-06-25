@@ -66,23 +66,24 @@ if not os.path.exists('data/analysis/sm4_data.csv') or \
         not os.path.exists('data/analysis/smmicro_data.csv'):
     sm4_df = pd.DataFrame()
     smmicro_df = pd.DataFrame()
-    # 2023 files
+    # SM4 files
     sm4_df = pd.concat([sm4_df, wav_data('data/2023_11/SM4/PLI2')],
                        ignore_index=True)
     sm4_df = pd.concat([sm4_df, wav_data('data/2023_11/SM4/PLI3')],
                        ignore_index=True)
-    smmicro_df = pd.concat([smmicro_df, wav_data('data/2023_11/SMMicro/PLI2')],
-                           ignore_index=True)
-    smmicro_df = pd.concat([smmicro_df, wav_data('data/2023_11/SMMicro/PLI3')],
-                           ignore_index=True)
-
-    # 2024 files
     sm4_df = pd.concat([sm4_df, wav_data('data/2024_03/SM4/PLI1')],
                        ignore_index=True)
     sm4_df = pd.concat([sm4_df, wav_data('data/2024_03/SM4/PLI2')],
                        ignore_index=True)
     sm4_df = pd.concat([sm4_df, wav_data('data/2024_03/SM4/PLI3')],
                        ignore_index=True)
+    
+    smmicro_df = pd.concat([smmicro_df, wav_data('data/2023_11/SMMicro/PLI2')],
+                           ignore_index=True)
+    smmicro_df = pd.concat([smmicro_df, wav_data('data/2023_11/SMMicro/PLI3')],
+                           ignore_index=True)
+
+    # SMMicro files
     smmicro_df = pd.concat([smmicro_df, wav_data('data/2024_03/SMMicro/PLI1')],
                            ignore_index=True)
     smmicro_df = pd.concat([smmicro_df, wav_data('data/2024_03/SMMicro/PLI2')],
@@ -95,6 +96,6 @@ if not os.path.exists('data/analysis/sm4_data.csv') or \
 else:
     sm4_df = pd.read_csv('data/analysis/sm4_data.csv')
     smmicro_df = pd.read_csv('data/analysis/smmicro_data.csv')
-# do more queries here
+# * do more queries here
 c = smmicro_df.query('Duration != 60.0')
 print(c)
