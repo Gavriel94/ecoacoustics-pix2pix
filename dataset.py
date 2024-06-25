@@ -3,11 +3,11 @@ import shutil
 import os
 
 
-def get_matching_summaries(sm4_summary_path: str,
-                           smmicro_summary_path: str,
-                           save_path: str = None):
+def find_matches(sm4_summary_path: str,
+                 smmicro_summary_path: str,
+                 save_path: str = None):
     """
-    Create a DataFrame of exact matches of timestamps between summaries.
+    Identifies which dates and times are exact matches in two summary files.
     """
     relevant_cols = ['DATE', 'TIME', 'LAT', 'LON']
     # Read SM4 data
@@ -27,12 +27,22 @@ def get_matching_summaries(sm4_summary_path: str,
     return matching_times
 
 
-def grab_files(matched_files: pd.DataFrame, wav_file_path: str):
+def create_dataset(matched_timestamps: pd.DataFrame, destination: str, mins_offset: int = 0):
+    """
+    Iterates through the df containing matching summaries and creates a list of matching SMMicro
+    and SM4 paths. Copies these files to `wav_file_path` to create the dataset.
+    Times in the 2024 file names are 1 minute out of the times listed in the summaries hence the
+    mins_offset parameter.
+
+    Args:
+        matched_timestamps (pd.DataFrame): Df containing the date and times of matching summaries.
+        destination (str): Where to save the WAV files.
+        mins_offset (int, optional): Align file name with time listed in summary. Defaults to 0.
+    """
     def format_time(time: str):
         formatted_time = ''
         hrs, mins, secs = time.split(':')
-        # ? file names are one minute less than the summary time
-        mins = int(mins) - 1
+        mins = int(mins) - mins_offset
         formatted_time = formatted_time + hrs + str(mins) + secs
         return formatted_time
 
@@ -40,17 +50,17 @@ def grab_files(matched_files: pd.DataFrame, wav_file_path: str):
         year, mon, day = date.split('-')
         return day
 
-    folder, date, mic, location = wav_file_path.split('/')
+    folder, date, mic, location = destination.split('/')
 
     date = date.replace('_', '')
-    day = [get_day(date) for date in matched_files['DATE']]
-    formatted_times = [format_time(time) for time in matched_files['TIME']]
+    day = [get_day(date) for date in matched_timestamps['DATE']]
+    formatted_times = [format_time(time) for time in matched_timestamps['TIME']]
     file_names = []
     for i, time in enumerate(formatted_times):
         if mic == 'SMMicro':
-            file_name = wav_file_path + '/' + location + '_' + date + day[i] + '_' + time
+            file_name = destination + '/' + location + '_' + date + day[i] + '_' + time
         elif mic == 'SM4':
-            file_name = wav_file_path + '/' + location + '-4' + '_' + date + day[i] + '_' + time
+            file_name = destination + '/' + location + '-4' + '_' + date + day[i] + '_' + time
         file_names.append(file_name)
 
     for file in file_names:
@@ -63,24 +73,24 @@ def grab_files(matched_files: pd.DataFrame, wav_file_path: str):
             print(str(e))
 
 
-pli1 = get_matching_summaries('data/2024_03/SM4/summaries/PLI1-4_A_Summary_202403.txt',
-                              'data/2024_03/SMMicro/summaries/PLI1_Summary_20240316_20240424.txt',
-                              'data/analysis/summary_matches/2024_03/PLI1.csv')
-pli2 = get_matching_summaries('data/2024_03/SM4/summaries/PLI2-4_A_Summary_202403.txt',
-                              'data/2024_03/SMMicro/summaries/PLI2_Summary_20240316_20240424.txt',
-                              'data/analysis/summary_matches/2024_03/PLI2.csv')
-pli3 = get_matching_summaries('data/2024_03/SM4/summaries/PLI3-4_A_Summary_202403.txt',
-                              'data/2024_03/SMMicro/summaries/PLI3_Summary_20240316_20240424.txt',
-                              'data/analysis/summary_matches/2024_03/PLI3.csv')
+pli1 = find_matches('data/2024_03/SM4/summaries/PLI1-4_A_Summary_202403.txt',
+                    'data/2024_03/SMMicro/summaries/PLI1_Summary_20240316_20240424.txt',
+                    'data/analysis/summary_matches/2024_03/PLI1.csv')
+pli2 = find_matches('data/2024_03/SM4/summaries/PLI2-4_A_Summary_202403.txt',
+                    'data/2024_03/SMMicro/summaries/PLI2_Summary_20240316_20240424.txt',
+                    'data/analysis/summary_matches/2024_03/PLI2.csv')
+pli3 = find_matches('data/2024_03/SM4/summaries/PLI3-4_A_Summary_202403.txt',
+                    'data/2024_03/SMMicro/summaries/PLI3_Summary_20240316_20240424.txt',
+                    'data/analysis/summary_matches/2024_03/PLI3.csv')
 
-grab_files(pli1, 'data/2024_03/SMMicro/PLI1')
-grab_files(pli1, 'data/2024_03/SM4/PLI1')
+create_dataset(pli1, 'data/2024_03/SMMicro/PLI1', mins_offset=1)
+create_dataset(pli1, 'data/2024_03/SM4/PLI1', mins_offset=1)
 
-grab_files(pli2, 'data/2024_03/SMMicro/PLI2')
-grab_files(pli2, 'data/2024_03/SM4/PLI2')
+create_dataset(pli2, 'data/2024_03/SMMicro/PLI2', mins_offset=1)
+create_dataset(pli2, 'data/2024_03/SM4/PLI2', mins_offset=1)
 
-grab_files(pli3, 'data/2024_03/SMMicro/PLI3')
-grab_files(pli3, 'data/2024_03/SM4/PLI3')
+create_dataset(pli3, 'data/2024_03/SMMicro/PLI3', mins_offset=1)
+create_dataset(pli3, 'data/2024_03/SM4/PLI3', mins_offset=1)
 
 len_pli1 = len(os.listdir('data/2024_03/SM4/PLI1'))
 len_pli2 = len(os.listdir('data/2024_03/SM4/PLI2'))
