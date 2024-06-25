@@ -11,11 +11,14 @@ def create_summary(dir_path: str):
         dir_path (str): Directory containing WAV files.
     """
     folder, year, mic, location = dir_path.split('/')
-    dest_path = folder + '/' + year + '/' + mic + '/' + 'summaries'
-    if not os.path.exists(dest_path):
-        os.mkdir(dest_path)
+    folder_path = folder + '/' + year + '/' + mic + '/' + 'summaries'
+    # create a directory to store the summaries in
+    if not os.path.exists(folder_path):
+        os.mkdir(folder_path)
     files = os.listdir(dir_path)
+    # sort files by time and date
     files.sort()
+    # map from ints to months
     months = {
         '01': 'Jan',
         '02': 'Feb',
@@ -30,11 +33,11 @@ def create_summary(dir_path: str):
         '11': 'Nov',
         '12': 'Dec'
     }
+    # save dates and times as defined in each wav file name
     dic = {
         'DATE': [],
         'TIME': []
     }
-    first_last_date = []
     for i, file in enumerate(files):
         _, date, time = file.split('_')
         year = date[:4]
@@ -43,20 +46,21 @@ def create_summary(dir_path: str):
         hours = time[:2]
         mins = time[2:4]
         secs = time[4:6]
+        # emulate date format from other summaries
         out_date = year + '-' + months[month] + '-' + day
+        # emulate time format from other summaries
         out_time = hours + ':' + mins + ':' + secs
         dic['DATE'].append(out_date)
         dic['TIME'].append(out_time)
         if i == 0:
-            d = year + month + day
-            first_last_date.append(d)
-        elif i == len(files)-1:
-            d = year + month + day
-            first_last_date.append(d)
+            first_date = year + month + day
+        elif i == len(files) - 1:
+            last_date = year + month + day
     df = pd.DataFrame(dic)
-    dest_path = (dest_path + '/' + location + '_Summary_' + first_last_date[0]
-                 + '_' + first_last_date[1] + '.txt')
-    df.to_csv(dest_path, index=False)
+    # emulate file name format from other summaries
+    file_name = location + '_Summary_' + first_date + '_' + last_date + '.txt'
+    file_path = (folder_path + '/' + file_name)
+    df.to_csv(file_path, index=False)
 
 
 def find_matches(sm4_summary_path: str,
@@ -65,7 +69,7 @@ def find_matches(sm4_summary_path: str,
     """
     Identifies which dates and times are exact matches in two summary files.
     """
-    relevant_cols = ['DATE', 'TIME', 'LAT', 'LON']
+    relevant_cols = ['DATE', 'TIME']
     # Read SM4 data
     sm4_df = pd.read_csv(sm4_summary_path)
     # Drop unnecessary columns
@@ -158,3 +162,13 @@ print('Total 2024 samples:', len_pli1 + len_pli2 + len_pli3)
 
 create_summary('data/2023_11/SM4/PLI2')
 create_summary('data/2023_11/SM4/PLI3')
+
+pli2_23 = find_matches('data/2023_11/SM4/summaries/PLI2_Summary_20231208_20231224.txt',
+                       'data/2023_11/SMMicro/summaries/PLI2_Summary_20231128-231219.txt',
+                       'data/analysis/summary_matches/2023_11/PLI2.csv')
+pli3_23 = find_matches('data/2023_11/SM4/summaries/PLI3_Summary_20231128_20231223.txt',
+                       'data/2023_11/SMMicro/summaries/PLI3_Summary_20231128-231219.txt',
+                       'data/analysis/summary_matches/2023_11/PLI3.csv')
+create_dataset(pli2_23, 'data/2023_11/SM4/PLI2')
+create_dataset(pli3_23, 'data/2023_11/SM4/PLI3')
+# TODO they fucked up the 11/12 in directory and file name
