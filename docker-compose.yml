@@ -18,3 +18,10 @@ services:
       image: mic_inf:latest
       volumes:
         - .:/app
+  
+  dataset:
+      build: .
+      command: python /app/dataset.py
+      image: mic_inf:latest
+      volumes:
+        - .:/app
