@@ -28,11 +28,6 @@ def wav_data(directory_path: str, verbose: bool = False):
     Analyse each wav file from a directory and return a pd.DataFrame 
     containing metrics from each file.
     """
-    num_channels = 0
-    sample_rate = 0
-    frames = 0
-    bit_depth = 0
-    duration = 0
     files = os.listdir(directory_path)
     dicts = []
     for file in files:
@@ -67,28 +62,28 @@ if not os.path.exists('data/analysis/sm4_data.csv') or \
     sm4_df = pd.DataFrame()
     smmicro_df = pd.DataFrame()
     # SM4 files
-    sm4_df = pd.concat([sm4_df, wav_data('data/2023_11/SM4/PLI2')],
+    sm4_df = pd.concat([sm4_df, wav_data('raw_data/2023_11/SM4/PLI2')],
                        ignore_index=True)
-    sm4_df = pd.concat([sm4_df, wav_data('data/2023_11/SM4/PLI3')],
+    sm4_df = pd.concat([sm4_df, wav_data('raw_data/2023_11/SM4/PLI3')],
                        ignore_index=True)
-    sm4_df = pd.concat([sm4_df, wav_data('data/2024_03/SM4/PLI1')],
+    sm4_df = pd.concat([sm4_df, wav_data('raw_data/2024_03/SM4/PLI1')],
                        ignore_index=True)
-    sm4_df = pd.concat([sm4_df, wav_data('data/2024_03/SM4/PLI2')],
+    sm4_df = pd.concat([sm4_df, wav_data('raw_data/2024_03/SM4/PLI2')],
                        ignore_index=True)
-    sm4_df = pd.concat([sm4_df, wav_data('data/2024_03/SM4/PLI3')],
+    sm4_df = pd.concat([sm4_df, wav_data('raw_data/2024_03/SM4/PLI3')],
                        ignore_index=True)
-    
-    smmicro_df = pd.concat([smmicro_df, wav_data('data/2023_11/SMMicro/PLI2')],
+
+    smmicro_df = pd.concat([smmicro_df, wav_data('raw_data/2023_11/SMMicro/PLI2')],
                            ignore_index=True)
-    smmicro_df = pd.concat([smmicro_df, wav_data('data/2023_11/SMMicro/PLI3')],
+    smmicro_df = pd.concat([smmicro_df, wav_data('raw_data/2023_11/SMMicro/PLI3')],
                            ignore_index=True)
 
     # SMMicro files
-    smmicro_df = pd.concat([smmicro_df, wav_data('data/2024_03/SMMicro/PLI1')],
+    smmicro_df = pd.concat([smmicro_df, wav_data('raw_data/2024_03/SMMicro/PLI1')],
                            ignore_index=True)
-    smmicro_df = pd.concat([smmicro_df, wav_data('data/2024_03/SMMicro/PLI2')],
+    smmicro_df = pd.concat([smmicro_df, wav_data('raw_data/2024_03/SMMicro/PLI2')],
                            ignore_index=True)
-    smmicro_df = pd.concat([smmicro_df, wav_data('data/2024_03/SMMicro/PLI3')],
+    smmicro_df = pd.concat([smmicro_df, wav_data('raw_data/2024_03/SMMicro/PLI3')],
                            ignore_index=True)
 
     sm4_df.to_csv('data/analysis/sm4_data.csv', index=False)
@@ -97,5 +92,5 @@ else:
     sm4_df = pd.read_csv('data/analysis/sm4_data.csv')
     smmicro_df = pd.read_csv('data/analysis/smmicro_data.csv')
 # * do more queries here
-c = smmicro_df.query('Duration != 60.0')
+c = smmicro_df.query('Duration == 60.0')
 print(c)
