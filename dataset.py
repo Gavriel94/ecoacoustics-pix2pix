@@ -3,12 +3,14 @@ import shutil
 import os
 
 
-def create_summary(dir_path: str):
+def create_summary(dir_path: str,
+                   dest_path: str = None):
     """
-    Creates a summary file based on the WAV file names.
+    Extracts dates and times from file names to create a new summary file.
 
     Args:
         dir_path (str): Directory containing WAV files.
+        dest_path (str, optional): Save file in specified location.
     """
     folder, year, mic, location = dir_path.split('/')
     folder_path = folder + '/' + year + '/' + mic + '/' + 'summaries'
@@ -57,17 +59,26 @@ def create_summary(dir_path: str):
         elif i == len(files) - 1:
             last_date = year + month + day
     df = pd.DataFrame(dic)
-    # emulate file name format from other summaries
+    # emulate file name format from other summaries: location, first and last date of recording
     file_name = location + '_Summary_' + first_date + '_' + last_date + '.txt'
     file_path = (folder_path + '/' + file_name)
+    print(f'Summary file generated\nSaved in {file_path}\n')
     df.to_csv(file_path, index=False)
 
 
 def find_matches(sm4_summary_path: str,
                  smmicro_summary_path: str,
-                 save_path: str = None):
+                 csv_save_path: str = None):
     """
-    Identifies which dates and times are exact matches in two summary files.
+    Iterates through the summary files to find exact matches between time and dates.§
+
+    Args:
+        sm4_summary_path (str): Path to SM4 summary file.
+        smmicro_summary_path (str): Path to SMMicro summary file.
+        csv_save_path (str, optional): Optionally save results as a CSV file.
+
+    Returns:
+        pd.DataFrame: DataFrame with two columns: DATE and TIME.
     """
     relevant_cols = ['DATE', 'TIME']
     # Read SM4 data
@@ -82,32 +93,38 @@ def find_matches(sm4_summary_path: str,
     smmicro_df = smmicro_df.drop_duplicates(subset=['TIME'])
 
     matching_times = pd.merge(sm4_df, smmicro_df, how='inner', on=['DATE', 'TIME'])
-    if save_path is not None:
-        matching_times.to_csv(save_path, index=False)
+    if csv_save_path is not None:
+        if '.csv' not in csv_save_path:
+            raise ValueError('csv_save_path must include \'.csv\'')
+        matching_times.to_csv(csv_save_path, index=False)
     return matching_times
 
 
-def create_dataset(matched_timestamps: pd.DataFrame,
-                   destination: str,
-                   mins_offset: int = 0,
-                   month_offset: int = 0,
+def create_dataset(timestamps: pd.DataFrame,
+                   source_dir: str,
+                   minutes_offset: int = 0,
+                   months_offset: int = 0,
                    verbose: bool = False):
     """
-    Iterates through the df containing matching summaries and creates a list of matching SMMicro
-    and SM4 paths. Copies these files to `wav_file_path` to create the dataset.
-    Months or mins are somtimes misaligned from the file names (for example
-    2023_11/SM4/PLI3 contains data from 11/23 and 12/23).
+    Extracts the .WAV files from SM4 or SMMicro folders whose filenames match the dates and times
+    listed in `matched_timestamps`. These files are copied into the `dataset/` directory into
+    folders with the same file structure as `copy_from`. For example, setting
+    `copy_from = data/2023_11/SM4/PLI2` then files will be saved in `dataset/2023_11/SM4/PLI2`.
+
+    Months or minutes are sometimes misaligned from the file name itself,
+    for example 2023_11/SM4/PLI3 contains data from 11/23 and 12/23.
+    The offset allows checking for times beyond the file name.
 
     Args:
-        matched_timestamps (pd.DataFrame): Df containing the date and times of matching summaries.
-        destination (str): Where to save the WAV files.
-        mins_offset (int, optional): Align file name with time listed in summary. Defaults to 0.
-        month_offset(int, optional): Align months in the file name to the directory. Defaults to 0.
+        matched_timestamps (pd.DataFrame): DataFrame with times and dates.
+        copy_from (str): Folder where the WAV files are located.
+        minutes_offset (int, optional): Look beyond time stated in file name. Defaults to 0.
+        months_offset (int, optional): Look beyond time stated in file name. Defaults to 0.
     """
     def format_time(time: str):
         formatted_time = ''
         hrs, mins, secs = time.split(':')
-        mins = str(int(mins) + mins_offset)
+        mins = str(int(mins) + minutes_offset)
         formatted_time = formatted_time + hrs + mins + secs
         return formatted_time
 
@@ -115,84 +132,194 @@ def create_dataset(matched_timestamps: pd.DataFrame,
         year, mon, day = date.split('-')
         return day
 
-    folder, date, mic, location = destination.split('/')
-
+    folder, date, mic, location = source_dir.split('/')
     date = date.replace('_', '')
-    date = str(int(date) + month_offset)
-    day = [get_day(date) for date in matched_timestamps['DATE']]
-    formatted_times = [format_time(time) for time in matched_timestamps['TIME']]
+    date = str(int(date) + months_offset)
+    day = [get_day(date) for date in timestamps['DATE']]
+    formatted_times = [format_time(time) for time in timestamps['TIME']]
     file_names = []
     for i, time in enumerate(formatted_times):
         if mic == 'SMMicro':
-            file_name = destination + '/' + location + '_' + date + day[i] + '_' + time
+            file_name = source_dir + '/' + location + '_' + date + day[i] + '_' + time
         elif mic == 'SM4':
-            file_name = destination + '/' + location + '-4' + '_' + date + day[i] + '_' + time
+            file_name = source_dir + '/' + location + '-4' + '_' + date + day[i] + '_' + time
         file_names.append(file_name)
 
     for file in file_names:
         file = file + '.wav'
         _, year, _, _, wav_file_name = file.split('/')
-        dir_path = 'dataset/' + year + '/' + location
+        dir_path = 'data/' + year + '/' + mic + '/' + location
         if not os.path.exists(dir_path):
-            os.mkdir(dir_path)
-        destination = dir_path + '/' + wav_file_name
+            os.makedirs(dir_path)
+        dest_dir = dir_path + '/' + wav_file_name
         try:
             if verbose:
-                print(file)
-            shutil.copy(file, destination)
+                print(f'{dest_dir}')
+            shutil.copy(file, dest_dir)
         except FileNotFoundError as e:
             if verbose:
                 print(str(e))
+    if verbose:
+        print()
 
 
-pli1 = find_matches('data/2024_03/SM4/summaries/PLI1-4_A_Summary_202403.txt',
-                    'data/2024_03/SMMicro/summaries/PLI1_Summary_20240316_20240424.txt',
-                    'data/analysis/summary_matches/2024_03/PLI1.csv')
-pli2 = find_matches('data/2024_03/SM4/summaries/PLI2-4_A_Summary_202403.txt',
-                    'data/2024_03/SMMicro/summaries/PLI2_Summary_20240316_20240424.txt',
-                    'data/analysis/summary_matches/2024_03/PLI2.csv')
-pli3 = find_matches('data/2024_03/SM4/summaries/PLI3-4_A_Summary_202403.txt',
-                    'data/2024_03/SMMicro/summaries/PLI3_Summary_20240316_20240424.txt',
-                    'data/analysis/summary_matches/2024_03/PLI3.csv')
+def summary_len(path):
+    with open(path, 'r') as f:
+        for i, _ in enumerate(f):
+            pass
+    return i + 1
 
-create_dataset(pli1, 'data/2024_03/SMMicro/PLI1', mins_offset=-1)
-create_dataset(pli1, 'data/2024_03/SM4/PLI1', mins_offset=-1)
 
-create_dataset(pli2, 'data/2024_03/SMMicro/PLI2', mins_offset=-1)
-create_dataset(pli2, 'data/2024_03/SM4/PLI2', mins_offset=-1)
+def num_features(path):
+    """
+    Counts the number of recordings from a microphone in a year.
 
-create_dataset(pli3, 'data/2024_03/SMMicro/PLI3', mins_offset=-1)
-create_dataset(pli3, 'data/2024_03/SM4/PLI3', mins_offset=-1)
+    Args:
+        path (str): Path to recordings parent folder. I.e. 'data/2023_11/SM4'
+    """
+    pli_dirs = [d for d in os.listdir(path)]
+    counts = []
+    for dir in pli_dirs:
+        full_path = f'{path}/{dir}'
+        len_dir = len(os.listdir(full_path))
+        counts.append(len_dir)
+        print(f'{full_path}: {len_dir} files')
+    print(f'Total number of files: {sum(counts)}\n')
 
-len_pli1 = len(os.listdir('dataset/2024_03/PLI1'))
-len_pli2 = len(os.listdir('dataset/2024_03/PLI2'))
-len_pli3 = len(os.listdir('dataset/2024_03/PLI3'))
-print(f'2024_03 PLI1 data samples: {len_pli1}')
-print(f'2024_03 PLI2 data samples: {len_pli2}')
-print(f'2024_03 PLI3 data samples: {len_pli3}')
-print('Total 2024 samples:', len_pli1 + len_pli2 + len_pli3)
 
-# generate missing summary files
-create_summary('data/2023_11/SM4/PLI2')
-create_summary('data/2023_11/SM4/PLI3')
+# # generate missing 2023 SM4 summary files
+create_summary('raw_data/2023_11/SM4/PLI2')
+create_summary('raw_data/2023_11/SM4/PLI3')
 
-pli2_23 = find_matches('data/2023_11/SM4/summaries/PLI2_Summary_20231208_20231224.txt',
-                       'data/2023_11/SMMicro/summaries/PLI2_Summary_20231128-231219.txt',
-                       'data/analysis/summary_matches/2023_11/PLI2.csv')
+print('Finding matches in 2023 files')
+pli2_2023 = find_matches('raw_data/2023_11/SM4/summaries/PLI2_Summary_20231208_20231224.txt',
+                         'raw_data/2023_11/SMMicro/summaries/PLI2_Summary_20231128-231219.txt',
+                         'data/2023_11/summaries/PLI2_2023_matching_summaries.csv')
 
-pli3_23 = find_matches('data/2023_11/SM4/summaries/PLI3_Summary_20231128_20231223.txt',
-                       'data/2023_11/SMMicro/summaries/PLI3_Summary_20231128-231219.txt',
-                       'data/analysis/summary_matches/2023_11/PLI3.csv')
+pli3_2023 = find_matches('raw_data/2023_11/SM4/summaries/PLI3_Summary_20231128_20231223.txt',
+                         'raw_data/2023_11/SMMicro/summaries/PLI3_Summary_20231128-231219.txt',
+                         'data/2023_11/summaries/PLI3_2023_matching_summaries.csv')
 
-create_dataset(pli2_23, 'data/2023_11/SM4/PLI2', month_offset=1)
+pli2_23_sm_ln = summary_len('data/2023_11/summaries/PLI2_2023_matching_summaries.csv')
+pli3_23_sm_ln = summary_len('data/2023_11/summaries/PLI3_2023_matching_summaries.csv')
 
-# Half of these files are date 11/23 and half are 12/23
-# running twice with an offset as a 'hacky' solution
-create_dataset(pli3_23, 'data/2023_11/SM4/PLI3')
-create_dataset(pli3_23, 'data/2023_11/SM4/PLI3', month_offset=1)
+print(f'Matching times and dates in PLI2: {pli2_23_sm_ln}')
+print(f'Matching times and dates in PLI3: {pli3_23_sm_ln}')
+print(f'Total: {pli2_23_sm_ln + pli3_23_sm_ln}')
+print()
 
-len_pli2_23 = len(os.listdir('dataset/2023_11/PLI2'))
-len_pli3_23 = len(os.listdir('dataset/2023_11/PLI3'))
-print(f'2023_11 PLI2 data samples: {len_pli2}')
-print(f'2023_11 PLI3 data samples: {len_pli3}')
-print('Total 2023 samples:', len_pli2_23 + len_pli3_23)
+print('Finding matches in 2024 files')
+pli1_2024 = find_matches('raw_data/2024_03/SM4/summaries/PLI1-4_A_Summary_202403.txt',
+                         'raw_data/2024_03/SMMicro/summaries/PLI1_Summary_20240316_20240424.txt',
+                         'data/2024_03/summaries/PLI1_2024_matching_summaries.csv')
+
+pli2_2024 = find_matches('raw_data/2024_03/SM4/summaries/PLI2-4_A_Summary_202403.txt',
+                         'raw_data/2024_03/SMMicro/summaries/PLI2_Summary_20240316_20240424.txt',
+                         'data/2024_03/summaries/PLI2_2024_matching_summaries.csv')
+
+pli3_2024 = find_matches('raw_data/2024_03/SM4/summaries/PLI3-4_A_Summary_202403.txt',
+                         'raw_data/2024_03/SMMicro/summaries/PLI3_Summary_20240316_20240424.txt',
+                         'data/2024_03/summaries/PLI3_2024_matching_summaries.csv')
+
+pli1_24_sm_ln = summary_len('data/2024_03/summaries/PLI1_2024_matching_summaries.csv')
+pli2_24_sm_ln = summary_len('data/2024_03/summaries/PLI2_2024_matching_summaries.csv')
+pli3_24_sm_ln = summary_len('data/2024_03/summaries/PLI3_2024_matching_summaries.csv')
+
+print(f'Matching times and dates in PLI1: {pli1_24_sm_ln}')
+print(f'Matching times and dates in PLI2: {pli2_24_sm_ln}')
+print(f'Matching times and dates in PLI3: {pli3_24_sm_ln}')
+print(f'Total: {pli1_24_sm_ln + pli2_24_sm_ln + pli3_24_sm_ln}')
+print()
+
+# recordings are from November and December so running through each location
+# twice with an offset
+print('Copying 2023 files')
+create_dataset(timestamps=pli2_2023,
+               source_dir='raw_data/2023_11/SM4/PLI2',
+               months_offset=0)
+
+create_dataset(timestamps=pli2_2023,
+               source_dir='raw_data/2023_11/SMMicro/PLI2',
+               months_offset=0)
+
+create_dataset(timestamps=pli3_2023,
+               source_dir='raw_data/2023_11/SM4/PLI3',
+               months_offset=0)
+
+create_dataset(timestamps=pli3_2023,
+               source_dir='raw_data/2023_11/SMMicro/PLI3',
+               months_offset=0)
+
+create_dataset(timestamps=pli2_2023,
+               source_dir='raw_data/2023_11/SM4/PLI2',
+               months_offset=1)
+
+create_dataset(timestamps=pli2_2023,
+               source_dir='raw_data/2023_11/SMMicro/PLI2',
+               months_offset=1)
+
+create_dataset(timestamps=pli3_2023,
+               source_dir='raw_data/2023_11/SM4/PLI3',
+               months_offset=1)
+
+create_dataset(timestamps=pli3_2023,
+               source_dir='raw_data/2023_11/SMMicro/PLI3',
+               months_offset=1)
+
+# SM4 file names are sometimes 1 minute less than the time listed in the summary so
+# running through each directory twice with the offset
+print('Copying 2024 files')
+print()
+create_dataset(timestamps=pli1_2024,
+               source_dir='raw_data/2024_03/SM4/PLI1',
+               minutes_offset=-1)
+
+create_dataset(timestamps=pli1_2024,
+               source_dir='raw_data/2024_03/SM4/PLI1',
+               minutes_offset=0)
+
+create_dataset(timestamps=pli1_2024,
+               source_dir='raw_data/2024_03/SMMicro/PLI1',
+               minutes_offset=-1)
+
+create_dataset(timestamps=pli1_2024,
+               source_dir='raw_data/2024_03/SMMicro/PLI1',
+               minutes_offset=0)
+
+create_dataset(timestamps=pli2_2024,
+               source_dir='raw_data/2024_03/SM4/PLI2',
+               minutes_offset=-1)
+
+create_dataset(timestamps=pli2_2024,
+               source_dir='raw_data/2024_03/SM4/PLI2',
+               minutes_offset=0)
+
+create_dataset(timestamps=pli2_2024,
+               source_dir='raw_data/2024_03/SMMicro/PLI2',
+               minutes_offset=-1)
+
+create_dataset(timestamps=pli2_2024,
+               source_dir='raw_data/2024_03/SMMicro/PLI2',
+               minutes_offset=0)
+
+create_dataset(timestamps=pli3_2024,
+               source_dir='raw_data/2024_03/SM4/PLI3',
+               minutes_offset=-1)
+
+create_dataset(timestamps=pli3_2024,
+               source_dir='raw_data/2024_03/SM4/PLI3',
+               minutes_offset=0)
+
+create_dataset(timestamps=pli3_2024,
+               source_dir='raw_data/2024_03/SMMicro/PLI3',
+               minutes_offset=-1)
+
+create_dataset(timestamps=pli3_2024,
+               source_dir='raw_data/2024_03/SMMicro/PLI3',
+               minutes_offset=0)
+
+# Count the number of total recordings
+num_features('data/2023_11/SM4')
+num_features('data/2023_11/SMMicro')
+num_features('data/2024_03/SM4')
+num_features('data/2024_03/SMMicro')
