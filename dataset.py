@@ -61,7 +61,10 @@ def create_summary(dir_path: str,
     df = pd.DataFrame(dic)
     # emulate file name format from other summaries: location, first and last date of recording
     file_name = location + '_Summary_' + first_date + '_' + last_date + '.txt'
-    file_path = (folder_path + '/' + file_name)
+    if dest_path is not None:
+        file_path = (dest_path + '/' + file)
+    else:
+        file_path = (folder_path + '/' + file_name)
     print(f'Summary file generated\nSaved in {file_path}\n')
     df.to_csv(file_path, index=False)
 
