@@ -3,7 +3,6 @@ import os
 import platform
 import shutil
 import json
-import argparse
 
 
 def remove_hidden_files(data_path: str):
@@ -148,8 +147,8 @@ def create_summary_file(dir_path: str):
     file_path = (folder_path + '/' + file_name)
     print(f'Summary file generated\nSaved in {file_path}\n')
     df.to_csv(file_path, index=False)
-    
-    
+
+
 def format_file_name(file_name):
     months = {
         '01': 'Jan',
@@ -243,25 +242,6 @@ def match_times(sm4_summary_path: str, smmicro_summary_path: str):
     return matching_times
 
 
-# def get_recordings(recordings_dir, matched_summaries):
-#     save_path = matched_summaries.replace('/summaries.csv', '')
-#     dt_df = pd.read_csv(matched_summaries)
-#     print(recordings_dir)
-#     files = os.listdir(recordings_dir)
-#     # sort files by time and date
-#     files.sort()
-#     for i, file in enumerate(files):
-#         date, time = format_file_name(file)
-#         for _, row in dt_df.iterrows():
-#             if row['DATE'] == date and row['TIME'] == time:
-#                 try:
-#                     print('Match found.')
-#                     print(f'Copying {os.path.join(recordings_dir, file)} to {save_path}')
-#                     shutil.copy(os.path.join(recordings_dir, file), save_path)
-#                 except FileNotFoundError as e:
-#                     print(str(e))
-
-
 def get_recordings(data: dict, summary_paths: str):
     """
     Creates and populates folders with .wav files matching the times
@@ -300,12 +280,7 @@ def get_recordings(data: dict, summary_paths: str):
                             print(str(e))
 
 
-DATA_ROOT = 'raw_data/'
-DATASET_ROOT = 'data/'
-
-
-def main():
-
+def create_dataset():
     # remove hidden files from macOS or Windows systems
     if platform.system() == 'Darwin' or platform.system() == 'Windows':
         remove_hidden_files(DATA_ROOT)
@@ -331,7 +306,10 @@ def main():
     summary_files_24 = match_summaries(summ_dir24, DATASET_ROOT)
 
     get_recordings(data_dict, summary_files_23)
+    get_recordings(data_dict, summary_files_24)
 
 
-if __name__ == '__main__':
-    main()
+DATA_ROOT = 'raw_data/'
+DATASET_ROOT = 'data/'
+
+create_dataset()
