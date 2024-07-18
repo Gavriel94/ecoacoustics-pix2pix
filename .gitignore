@@ -6,3 +6,4 @@ raw_data
 __pychache__
 *.pyc
 data
+backups
