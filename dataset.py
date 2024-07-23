@@ -1,8 +1,12 @@
 import pandas as pd
 import os
+import librosa
+import matplotlib.pyplot as plt
+import numpy as np
 import platform
 import shutil
 import json
+from PIL import Image
 
 
 def remove_hidden_files(data_path: str):
@@ -106,7 +110,6 @@ def create_summary_file(dir_path: str):
         dir_path (str): Directory containing .wav files.
     """
     def format_date(wav_file_name):
-        # PLI2_20240106_014700.wav
         _, date, _ = file.split('_')
         year = date[:4]
         month = date[4:6]
@@ -180,7 +183,8 @@ def format_file_name(file_name):
 
 def match_summaries(summary_dir: list, data_to: str):
     """
-    Finds matching times from different microphones for each location-based summary file.
+    Finds matching times from different microphones for each location-based 
+    summary file.
 
     Args:
         summary_dir (list): List of summary directories for a year.
@@ -242,25 +246,34 @@ def match_times(sm4_summary_path: str, smmicro_summary_path: str):
     return matching_times
 
 
-def get_recordings(data: dict, summary_paths: str):
+def get_recordings(data_dict: dict,
+                   data_root: str,
+                   dataset_root: str,
+                   summary_paths: list,
+                   verbose: bool = True):
     """
     Creates and populates folders with .wav files matching the times
     in the summary files.
 
     Args:
         data (dict): Paths to data organised by year and microphone.
-        summary_paths (str): _description_
+        summary_paths (list): Paths to files containing matching time and dates
+            between microphone recordings.
+
+    Returns:
+        list: Paths where files have been saved.
     """
+    save_paths = set()
     for i, summary in enumerate(summary_paths):
         _, year, location, _ = summary.split('/')
         # paths to the appropriate recording location for each microphone
-        recordings = [path for sublist in list(data[year].values())
+        recordings = [path for sublist in list(data_dict[year].values())
                       for path in sublist if location in path]
 
         # ensure folders containing recordings exist
         if len(recordings) <= 0:
-            raise ValueError('Cannot find a folder containing recordings.\n'
-                             f'Looking for {DATA_ROOT}/{year}/{data.keys()[i]}/{location}')
+            raise ValueError('Cannot find '
+                             f'{data_root}/{year}/{data_dict.keys()[i]}/{location}')
 
         dt_df = pd.read_csv(summary)
         for folder in recordings:
@@ -271,25 +284,130 @@ def get_recordings(data: dict, summary_paths: str):
                 for _, row in dt_df.iterrows():
                     if row['DATE'] == date and row['TIME'] == time:
                         try:
-                            print('Match found')
                             recording = os.path.join(folder, file)
-                            save_path = f'{DATASET_ROOT}/{year}/{location}'
-                            print(f'Copying {recording} to {save_path}')
+                            save_path = f'{dataset_root}{year}/{location}'
+                            if verbose:
+                                print(f'Copying {recording} to {save_path}')
                             shutil.copy(recording, save_path)
+                            save_paths.add(save_path)
                         except FileNotFoundError as e:
                             print(str(e))
+    return list(save_paths)
 
 
-def create_dataset():
+def create_spectrograms(directories: list,
+                        n_fft: int,
+                        dataset_root: str,
+                        hop_length: int = None,
+                        labels: bool = None,
+                        verbose: bool = False):
+    """
+    Create spectrograms for all .wav files in a folder.
+
+    Args:
+        directories (list): Paths to folders containing .wav files.
+        n_fft (int): Number of fast Fourier transform points.
+        hop_length (int, optional): Number of samples in each frame.
+            Default is n_fft // 4.
+        verbose (bool, optional): Display progress. Defaults to False.
+    """
+    if hop_length is None:
+        hop_length = n_fft // 4
+    save_paths = set()
+    for directory in directories:
+        files = os.listdir(directory)
+        for i, file in enumerate(files):
+            if verbose:
+                print(f'Analysing {file}, {i + 1}/{len(files)}')
+                if file.split('.')[-1] == 'csv':
+                    continue
+            path = os.path.join(directory, file)
+            try:
+                y, sr = librosa.load(path)
+                s = librosa.stft(y, n_fft=n_fft, hop_length=hop_length)
+                s_db = librosa.amplitude_to_db(np.abs(s), ref=np.max)
+                plt.figure(figsize=(10, 6))
+                librosa.display.specshow(s_db,
+                                         sr=sr,
+                                         hop_length=hop_length,
+                                         x_axis=None if labels is None else 'time',
+                                         y_axis=None if labels is None else 'log',
+                                         cmap='viridis')
+                if labels is None:
+                    plt.axis('off')
+                else:
+                    plt.colorbar(format='%+2.0f dB')
+                    plt.title(f"{file.replace('.wav', '')}")
+                    plt.xlabel('Time (s)')
+                    plt.ylabel('Frequency (Hz)')
+                save_path = directory.replace(f'{dataset_root}', f'{dataset_root}spectrograms/')
+                os.makedirs(save_path, exist_ok=True)
+                plt.savefig(f"{save_path}/{file.replace('.wav', '.png')}",
+                            bbox_inches='tight',
+                            pad_inches=0)
+                plt.close()
+                save_paths.add(save_path)
+            except Exception as e:
+                print(str(e))
+    return list(save_paths)
+
+
+def pair_spectrograms(directories: list):
+    def extract_datetime(filename):
+        loc, date, time = filename.split('_')
+        datetime = '_'.join([date, time])
+        return loc, datetime
+
+    smmicro_spectrograms = []
+    sm4_spectrograms = []
+    for directory in directories:
+        files = os.listdir(directory)
+        for filename in files:
+            loc, datetime = extract_datetime(filename)
+            if '-4' in filename:
+                loc = loc.replace('-4', '')
+                sm4_spectrograms.append((loc, datetime, os.path.join(directory, filename)))
+            else:
+                smmicro_spectrograms.append((loc, datetime, os.path.join(directory, filename)))
+
+    paired_spectrograms = []
+    for loc1, dt1, file1 in smmicro_spectrograms:
+        for loc2, dt2, file2 in sm4_spectrograms:
+            if loc1 == loc2 and dt1 == dt2:
+                paired_spectrograms.append((file1, file2))
+    return paired_spectrograms
+
+
+def stitch_images(paired_spectrogram_paths: list[tuple], dataset_root: str):
+    os.makedirs(f'{dataset_root}dataset', exist_ok=True)
+    separator_width = 10
+    separator_colour = (255, 255, 255)
+    for i, pair in enumerate(paired_spectrogram_paths):
+        smmicro_path = pair[0]
+        sm4_path = pair[1]
+        smm_spec = Image.open(smmicro_path)
+        sm4_spec = Image.open(sm4_path)
+        extended_width = smm_spec.width + sm4_spec.width + separator_width
+        height = smm_spec.height
+        stitched = Image.new('RGB', (extended_width, height), separator_colour)
+        stitched.paste(smm_spec, (0, 0))
+        stitched.paste(sm4_spec, (smm_spec.width + separator_width, 0))
+        datetime = smmicro_path.split('/')[-1]  # includes '.png' at the end
+        output_dir = os.path.join(dataset_root, 'dataset', datetime)
+        stitched.save(output_dir)
+        print(f'Stiched {i + 1}/{len(paired_spectrogram_paths)} images')
+
+
+def create_dataset(data_root: str, dataset_root: str):
     # remove hidden files from macOS or Windows systems
     if platform.system() == 'Darwin' or platform.system() == 'Windows':
-        remove_hidden_files(DATA_ROOT)
+        remove_hidden_files(data_root)
 
     # create a directory to store the dataset in
-    os.mkdir(DATASET_ROOT)
+    os.makedirs(dataset_root, exist_ok=True)
 
     # organise the data by year and microphone
-    data_dict = create_data_dict(DATA_ROOT, DATASET_ROOT)
+    data_dict = create_data_dict(data_root, dataset_root)
 
     # get paths to all data in each year, organised by microphone
     paths_2023 = get_paths(data_dict, '2023_11')
@@ -302,14 +420,23 @@ def create_dataset():
                   for path in sublist if 'summaries' in path]
 
     # find matches between summary files, save them and retain the path
-    summary_files_23 = match_summaries(summ_dir23, DATASET_ROOT)
-    summary_files_24 = match_summaries(summ_dir24, DATASET_ROOT)
+    summary_files_23 = match_summaries(summ_dir23, dataset_root)
+    summary_files_24 = match_summaries(summ_dir24, dataset_root)
 
-    get_recordings(data_dict, summary_files_23)
-    get_recordings(data_dict, summary_files_24)
+    # copy matching recordings from raw data to dataset folders
+    recordings_23 = get_recordings(data_dict, data_root, dataset_root, summary_files_23)
+    recordings_24 = get_recordings(data_dict, data_root, dataset_root, summary_files_24)
+
+    specs_23 = create_spectrograms(recordings_23, n_fft=4096,
+                                   dataset_root=dataset_root, verbose=True)
+    specs_24 = create_spectrograms(recordings_24, n_fft=4096,
+                                   dataset_root=dataset_root, verbose=True)
+
+    spec_paths = []
+    spec_paths.extend(specs_23)
+    spec_paths.extend(specs_24)
+    paired_spectrograms = pair_spectrograms(spec_paths)
+    stitch_images(paired_spectrograms, dataset_root)
 
 
-DATA_ROOT = 'raw_data/'
-DATASET_ROOT = 'data/'
-
-create_dataset()
+create_dataset(data_root='raw_data/', dataset_root='data/')
