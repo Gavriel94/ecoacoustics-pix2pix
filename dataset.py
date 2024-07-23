@@ -7,6 +7,7 @@ import platform
 import shutil
 import json
 from PIL import Image
+from scipy.signal import correlate2d
 
 
 def remove_hidden_files(data_path: str):
@@ -317,11 +318,11 @@ def create_spectrograms(directories: list,
     for directory in directories:
         files = os.listdir(directory)
         for i, file in enumerate(files):
+            if file.split('.')[-1] == 'csv':
+                continue
             if verbose:
                 print(f'Generating spectrogram for {file}, '
                       f'{i + 1}/{len(files)} files')
-                if file.split('.')[-1] == 'csv':
-                    continue
             path = os.path.join(directory, file)
             try:
                 y, sr = librosa.load(path)
@@ -351,6 +352,18 @@ def pair_spectrograms(directories: list):
         datetime = '_'.join([date, time])
         return loc, datetime
 
+    def load_spectrogram(file_path: str):
+        image = Image.open(file_path)
+        return np.array(image)
+
+    def cross_correlate(spec1: np.array, spec2: np.array):
+        correlation = correlate2d(spec1, spec2, mode='valid')
+        y, x = np.unravel_index(np.argmax(correlation), correlation.shape)
+        return x
+
+    def save_spectrogram(image, path):
+        imageio.imwrite(path, image)
+
     smmicro_spectrograms = []
     sm4_spectrograms = []
     for directory in directories:
@@ -364,10 +377,26 @@ def pair_spectrograms(directories: list):
                 smmicro_spectrograms.append((loc, datetime, os.path.join(directory, filename)))
 
     paired_spectrograms = []
+    i = 1
     for loc1, dt1, file1 in smmicro_spectrograms:
         for loc2, dt2, file2 in sm4_spectrograms:
             if loc1 == loc2 and dt1 == dt2:
+                smm_spec = load_spectrogram(file1)
+                sm4_spec = load_spectrogram(file2)
+                offset = cross_correlate(smm_spec, sm4_spec)
+                
+                if offset > 0:
+                    aligned_smmicro = smm_spec[:, offset:]
+                    aligned_sm4 = sm4_spec[:, :aligned_smmicro.shape[1]]
+                else:
+                    aligned_sm4 = sm4_spec[:, -offset:]
+                    aligned_smmicro = smm_spec[:, :aligned_sm4.shape[1]]
+                save_spectrogram(aligned_smmicro, file1)
+                save_spectrogram(aligned_sm4, file2)
                 paired_spectrograms.append((file1, file2))
+                print(f'paired {i} spectrograms')
+                print(paired_spectrograms[-1])
+                i += 1
     return paired_spectrograms
 
 
@@ -400,33 +429,34 @@ def create_dataset(data_root: str, dataset_root: str):
     os.makedirs(dataset_root, exist_ok=True)
 
     # organise the data by year and microphone
-    data_dict = create_data_dict(data_root, dataset_root)
+    # data_dict = create_data_dict(data_root, dataset_root)
 
     # get paths to all data in each year, organised by microphone
-    paths_2023 = get_paths(data_dict, '2023_11')
-    paths_2024 = get_paths(data_dict, '2024_03')
+    # paths_2023 = get_paths(data_dict, '2023_11')
+    # paths_2024 = get_paths(data_dict, '2024_03')
 
     # list of paths to the summary directories for all microphones
-    summ_dir23 = [path for sublist in list(paths_2023.values())
-                  for path in sublist if 'summaries' in path]
-    summ_dir24 = [path for sublist in list(paths_2024.values())
-                  for path in sublist if 'summaries' in path]
+    # summ_dir23 = [path for sublist in list(paths_2023.values())
+    #               for path in sublist if 'summaries' in path]
+    # summ_dir24 = [path for sublist in list(paths_2024.values())
+    #               for path in sublist if 'summaries' in path]
 
     # find matches between summary files, save them and retain the path
-    summary_files_23 = match_summaries(summ_dir23, dataset_root)
-    summary_files_24 = match_summaries(summ_dir24, dataset_root)
+    # summary_files_23 = match_summaries(summ_dir23, dataset_root)
+    # summary_files_24 = match_summaries(summ_dir24, dataset_root)
 
     # copy matching recordings from raw data to dataset folders
-    recordings_23 = get_recordings(data_dict, data_root, dataset_root, summary_files_23)
-    recordings_24 = get_recordings(data_dict, data_root, dataset_root, summary_files_24)
+    # recordings_23 = get_recordings(data_dict, data_root, dataset_root, summary_files_23)
+    # recordings_24 = get_recordings(data_dict, data_root, dataset_root, summary_files_24)
 
-    specs_23 = create_spectrograms(recordings_23, n_fft=4096,
-                                   dataset_root=dataset_root, verbose=True)
-    specs_24 = create_spectrograms(recordings_24, n_fft=4096,
-                                   dataset_root=dataset_root, verbose=True)
+    # specs_23 = create_spectrograms(recordings_23, n_fft=4096,
+    #                                dataset_root=dataset_root, verbose=True)
+    # specs_24 = create_spectrograms(recordings_24, n_fft=4096,
+    #                                dataset_root=dataset_root, verbose=True)
+    specs_24 = ['data/spectrograms/2024_03/PLI2', 'data/spectrograms/2024_03/PLI1', 'data/spectrograms/2024_03/PLI3']
 
     spec_paths = []
-    spec_paths.extend(specs_23)
+    # spec_paths.extend(specs_23)
     spec_paths.extend(specs_24)
     paired_spectrograms = pair_spectrograms(spec_paths)
     stitch_images(paired_spectrograms, dataset_root)
