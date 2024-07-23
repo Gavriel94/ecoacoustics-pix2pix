@@ -5,3 +5,4 @@ librosa
 soundfile
 Pillow
 imageio
+scipy
