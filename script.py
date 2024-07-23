@@ -1,2 +1,3 @@
-from dataset import create_dataset
+import os
 
+print(len(os.listdir('data/dataset')))

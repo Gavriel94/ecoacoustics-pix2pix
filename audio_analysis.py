@@ -1,10 +1,6 @@
 import wave
 import os
 import pandas as pd
-import matplotlib.pyplot as plt
-import librosa
-import librosa.display
-import numpy as np
 
 
 def gather_files():

@@ -1,7 +1,7 @@
 import pandas as pd
 import os
 import librosa
-import matplotlib.pyplot as plt
+import imageio
 import numpy as np
 import platform
 import shutil
@@ -183,7 +183,7 @@ def format_file_name(file_name):
 
 def match_summaries(summary_dir: list, data_to: str):
     """
-    Finds matching times from different microphones for each location-based 
+    Finds matching times from different microphones for each location-based
     summary file.
 
     Args:
@@ -318,7 +318,8 @@ def create_spectrograms(directories: list,
         files = os.listdir(directory)
         for i, file in enumerate(files):
             if verbose:
-                print(f'Analysing {file}, {i + 1}/{len(files)}')
+                print(f'Generating spectrogram for {file}, '
+                      f'{i + 1}/{len(files)} files')
                 if file.split('.')[-1] == 'csv':
                     continue
             path = os.path.join(directory, file)
@@ -326,26 +327,18 @@ def create_spectrograms(directories: list,
                 y, sr = librosa.load(path)
                 s = librosa.stft(y, n_fft=n_fft, hop_length=hop_length)
                 s_db = librosa.amplitude_to_db(np.abs(s), ref=np.max)
-                plt.figure(figsize=(10, 6))
-                librosa.display.specshow(s_db,
-                                         sr=sr,
-                                         hop_length=hop_length,
-                                         x_axis=None if labels is None else 'time',
-                                         y_axis=None if labels is None else 'log',
-                                         cmap='viridis')
-                if labels is None:
-                    plt.axis('off')
-                else:
-                    plt.colorbar(format='%+2.0f dB')
-                    plt.title(f"{file.replace('.wav', '')}")
-                    plt.xlabel('Time (s)')
-                    plt.ylabel('Frequency (Hz)')
-                save_path = directory.replace(f'{dataset_root}', f'{dataset_root}spectrograms/')
+
+                # normalise spectrogram to range (0, 255)
+                s_db_norm = 255 * (s_db - s_db.min()) / (s_db.max() - s_db.min())
+                s_db_norm = s_db_norm.astype(np.uint8)
+
+                # create path and directory
+                save_path = directory.replace(f'{dataset_root}',
+                                              f'{dataset_root}spectrograms/')
                 os.makedirs(save_path, exist_ok=True)
-                plt.savefig(f"{save_path}/{file.replace('.wav', '.png')}",
-                            bbox_inches='tight',
-                            pad_inches=0)
-                plt.close()
+                # save image
+                imageio.imwrite(f"{save_path}/{file.replace('.wav', '.png')}",
+                                s_db_norm)
                 save_paths.add(save_path)
             except Exception as e:
                 print(str(e))
