@@ -501,7 +501,6 @@ def create_dataset(data_root: str, dataset_root: str):
                                    dataset_root=dataset_root, verbose=True)
     specs_24 = create_spectrograms(recordings_24, n_fft=4096,
                                    dataset_root=dataset_root, verbose=True)
-    # specs_24 = ['data/spectrograms/2024_03/PLI2', 'data/spectrograms/2024_03/PLI1', 'data/spectrograms/2024_03/PLI3']
 
     # merge all available spectrograms into one list
     spec_paths = []
