@@ -9,6 +9,8 @@ import json
 from PIL import Image
 from scipy.signal import correlate2d
 
+from audio_analysis import analyse_recordings
+
 
 def remove_hidden_files(data_path: str):
     """
@@ -471,6 +473,9 @@ def create_dataset(data_root: str, dataset_root: str):
     # create a directory to store the dataset in
     os.makedirs(dataset_root, exist_ok=True)
 
+    # list metrics for each recording and save them in the dataset folder
+    analyse_recordings(data_root, dataset_root, verbose=True)
+
     # organise the data by year and microphone
     data_dict = create_data_dict(data_root, dataset_root)
 
@@ -498,10 +503,13 @@ def create_dataset(data_root: str, dataset_root: str):
                                    dataset_root=dataset_root, verbose=True)
     # specs_24 = ['data/spectrograms/2024_03/PLI2', 'data/spectrograms/2024_03/PLI1', 'data/spectrograms/2024_03/PLI3']
 
+    # merge all available spectrograms into one list
     spec_paths = []
     spec_paths.extend(specs_23)
     spec_paths.extend(specs_24)
+    # find matching pairs by pathname
     paired_spectrograms = pair_spectrograms(spec_paths)
+    # stich the images together to create the cGAN dataset
     stitch_images(paired_spectrograms, dataset_root)
 
 
