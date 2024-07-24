@@ -3,33 +3,28 @@ import os
 import pandas as pd
 
 
-def gather_files():
-    sm4_df = pd.DataFrame()
-    smmicro_df = pd.DataFrame()
+def analyse_recordings(data_root: str, dataset_root: str, verbose: bool = False):
+    """
+    Record the number of channels, sample rate, number of frames, sample
+    width and duration for all audio files.
+    Saves the data in the dataset folder, under the names of each microphone.
 
-    sm4_df = pd.concat([sm4_df, wav_data('raw_data/2023_11/SM4/PLI2')],
-                       ignore_index=True)
-    sm4_df = pd.concat([sm4_df, wav_data('raw_data/2023_11/SM4/PLI3')],
-                       ignore_index=True)
-    sm4_df = pd.concat([sm4_df, wav_data('raw_data/2024_03/SM4/PLI1')],
-                       ignore_index=True)
-    sm4_df = pd.concat([sm4_df, wav_data('raw_data/2024_03/SM4/PLI2')],
-                       ignore_index=True)
-    sm4_df = pd.concat([sm4_df, wav_data('raw_data/2024_03/SM4/PLI3')],
-                       ignore_index=True)
+    Args:
+        data_root (str): Path to raw data.
+        dataset_root (str): Path to the dataset.
+        verbose (bool, optional): Display a count of the files.
+    """
+    os.makedirs(f'{dataset_root}analysis', exist_ok=True)
+    for year_dir in os.listdir(data_root):
+        for mic_dir in os.listdir(os.path.join(data_root, year_dir)):
+            df = pd.DataFrame()
+            for loc_dir in os.listdir(os.path.join(data_root, year_dir, mic_dir)):
+                if loc_dir == 'summaries':
+                    continue
+                full_path = os.path.join(data_root, year_dir, mic_dir, loc_dir)
+                df = pd.concat([df, wav_data(full_path, verbose=verbose)], ignore_index=True)
 
-    smmicro_df = pd.concat([smmicro_df, wav_data('raw_data/2023_11/SMMicro/PLI2')],
-                           ignore_index=True)
-    smmicro_df = pd.concat([smmicro_df, wav_data('raw_data/2023_11/SMMicro/PLI3')],
-                           ignore_index=True)
-    smmicro_df = pd.concat([smmicro_df, wav_data('raw_data/2024_03/SMMicro/PLI1')],
-                           ignore_index=True)
-    smmicro_df = pd.concat([smmicro_df, wav_data('raw_data/2024_03/SMMicro/PLI2')],
-                           ignore_index=True)
-    smmicro_df = pd.concat([smmicro_df, wav_data('raw_data/2024_03/SMMicro/PLI3')],
-                           ignore_index=True)
-
-    return sm4_df, smmicro_df
+                df.to_csv(f'{dataset_root}analysis/{mic_dir}_data.csv', index=False)
 
 
 def get_dict(num_channels: int, sample_rate: int,
@@ -54,14 +49,21 @@ def get_dict(num_channels: int, sample_rate: int,
 
 def wav_data(directory_path: str, verbose: bool = False):
     """
-    Analyse each wav file from a directory and return a pd.DataFrame
-    containing metrics from each file.
+    Record the number of channels, sample rate, number of frames, sample
+    width and duration of each audio file in a directory.
+
+    Args:
+        directory_path (str): Path to the recordings.
+        verbose (bool, optional): . Defaults to False.
+
+    Returns:
+        pd.DataFrame: DataFrame containing metrics.
     """
     files = os.listdir(directory_path)
     dicts = []
-    for file in files:
+    for i, file in enumerate(files):
         if verbose:
-            print('Analysing', file)
+            print(f'Analysing {file} {i + 1}/{len(files)} files')
         path = os.path.join(directory_path, file)
         try:
             with wave.open(path, 'rb') as w:
@@ -84,24 +86,3 @@ def wav_data(directory_path: str, verbose: bool = False):
                          duration, path,
                          str(e)))
     return pd.DataFrame(dicts)
-
-
-def run_queries(sm4_df: pd.DataFrame,
-                smmicro_df: pd.DataFrame):
-    pass
-    # c = smmicro_df.query('Duration == 60.0')
-    # print(c)
-
-
-DATASET_ROOT = 'data/'
-
-if not os.path.exists(f'{DATASET_ROOT}/analysis/sm4_data.csv') \
-        or not os.path.exists(f'{DATASET_ROOT}/analysis/smmicro_data.csv'):
-    os.makedirs(f'{DATASET_ROOT}/analysis')
-    sm4_df, smmicro_df = gather_files()
-    sm4_df.to_csv(f'{DATASET_ROOT}/analysis/sm4_data.csv', index=False)
-    smmicro_df.to_csv(f'{DATASET_ROOT}/analysis/smmicro_data.csv', index=False)
-else:
-    sm4_df = pd.read_csv(f'{DATASET_ROOT}/analysis/sm4_data.csv')
-    smmicro_df = pd.read_csv(f'{DATASET_ROOT}/analysis/smmicro_data.csv')
-    run_queries(sm4_df, smmicro_df)
