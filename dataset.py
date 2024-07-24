@@ -1,4 +1,3 @@
-from ctypes import alignment
 import pandas as pd
 import os
 import librosa
@@ -29,12 +28,16 @@ def remove_hidden_files(data_path: str):
 
 def create_data_dict(data_from: str, data_to: str, save_json=True):
     """
-    Creates a dictionary of paths to all recordings organised by year and
-    microphone. Is able to save a JSON file is saved in the dataset directory.
+    Creates a dictionary of paths to recordings organised by year and microphone.
+    Optionally saves the dictionary as a JSON file.
 
     Args:
         data_from (str): Path of source data.
         data_to (str): Path where dataset will be stored.
+        save_json (bool, optional): Saves data as JSON. Defaults to True.
+
+    Returns:
+        dict: Data organised by year and microphone.
     """
     data_dict = {}
     years = os.listdir(data_from)
@@ -154,7 +157,16 @@ def create_summary_file(dir_path: str):
     df.to_csv(file_path, index=False)
 
 
-def format_file_name(file_name):
+def format_file_name(file_name: str):
+    """
+    Extracts the date and time from a recordings file name.
+
+    Args:
+        file_name (str): The recordings file name.
+
+    Returns:
+        tuple(str, str): Date and time of the recording.
+    """
     months = {
         '01': 'Jan',
         '02': 'Feb',
@@ -177,10 +189,10 @@ def format_file_name(file_name):
     mins = time[2:4]
     secs = time[4:6]
     # emulate date format from other summaries
-    out_date = year + '-' + months[month] + '-' + day
+    date = year + '-' + months[month] + '-' + day
     # emulate time format from other summaries
-    out_time = hours + ':' + mins + ':' + secs
-    return out_date, out_time
+    time = hours + ':' + mins + ':' + secs
+    return date, time
 
 
 def match_summaries(summary_dir: list, data_to: str):
@@ -231,7 +243,7 @@ def match_times(sm4_summary_path: str, smmicro_summary_path: str):
         smmicro_summary_path (str): Path to SMMicro summary file.
 
     Returns:
-        pd.DataFrame: Columns: DATE and TIME where recordings match.
+        pd.DataFrame: Columns: DATE and TIME of matching recordings.
     """
     def normalise_df(df):
         "Keep date and time columns and ensure there's no duplicates."
@@ -348,11 +360,22 @@ def create_spectrograms(directories: list,
 
 
 def pair_spectrograms(directories: list):
+    """
+    Pairs the paths to SMMicro and SM4 recordings based on location,
+    date and time.
+
+    Args:
+        directories (list): List of all folders containing spectrograms.
+    """
     def extract_datetime(filename):
+        """
+        Extracts location and datetime from the recordings filename.
+        """
         loc, date, time = filename.split('_')
         datetime = '_'.join([date, time])
         return loc, datetime
 
+    # get independent lists of SMMicro and SM4 spectrograms
     smmicro_spectrograms = []
     sm4_spectrograms = []
     for directory in directories:
@@ -365,6 +388,8 @@ def pair_spectrograms(directories: list):
             else:
                 smmicro_spectrograms.append((loc, datetime, os.path.join(directory, filename)))
 
+    # match SMMicro and SM4 spectrograms based on
+    # location and datetime in their filenames
     paired_spectrograms = []
     for loc1, dt1, file1 in smmicro_spectrograms:
         for loc2, dt2, file2 in sm4_spectrograms:
@@ -375,11 +400,23 @@ def pair_spectrograms(directories: list):
 
 
 def stitch_images(paired_spectrogram_paths: list[tuple], dataset_root: str):
+    """
+    Stiches SMMicro and SM4 paired spectrograms with SMMicro images on the left.
+    Matches dataset format for a pix2pix cGAN.
+
+    Args:
+        paired_spectrogram_paths (list[tuple]): SMMicro and SM4 pairs.
+        dataset_root (str): Root to the dataset.
+    """
     def load_spectrogram_as_np_arr(file_path: str):
         image = Image.open(file_path)
         return np.array(image)
 
     def cross_correlate(spec1: np.array, spec2: np.array):
+        """
+        Calculates where spec2 best aligns with spec1 by finding the
+        x-coordinate with the highest correlation.
+        """
         correlation = correlate2d(spec1, spec2, mode='valid')
         y, x = np.unravel_index(np.argmax(correlation), correlation.shape)
         return x
@@ -403,16 +440,18 @@ def stitch_images(paired_spectrogram_paths: list[tuple], dataset_root: str):
             aligned_sm4 = sm4_spec[:, -offset:]
             aligned_smmicro = smm_spec[:, :aligned_sm4.shape[1]]
 
-        # Get dimensions
+        # get dimensions
         smmicro_width, smmicro_height = aligned_smmicro.shape[1], aligned_smmicro.shape[0]
         sm4_width, sm4_height = aligned_sm4.shape[1], aligned_sm4.shape[0]
 
-        # Ensure heights are the same
+        # ensure heights are the same
         if smmicro_height != sm4_height:
             raise ValueError("Aligned spectrograms have different heights")
         extended_width = smmicro_width + sm4_width + separator_width
         height = smmicro_height
 
+        # stiched aligned spectrograms on the same canvas
+        # with SMMicro on the left and SM4 on the right
         stitched = Image.new('RGB', (extended_width, height), separator_colour)
         aligned_smmicro_img = Image.fromarray(aligned_smmicro)
         aligned_sm4_img = Image.fromarray(aligned_sm4)
@@ -432,35 +471,35 @@ def create_dataset(data_root: str, dataset_root: str):
     # create a directory to store the dataset in
     os.makedirs(dataset_root, exist_ok=True)
 
-    # # organise the data by year and microphone
-    # data_dict = create_data_dict(data_root, dataset_root)
+    # organise the data by year and microphone
+    data_dict = create_data_dict(data_root, dataset_root)
 
     # # get paths to all data in each year, organised by microphone
-    # # paths_2023 = get_paths(data_dict, '2023_11')
-    # paths_2024 = get_paths(data_dict, '2024_03')
+    paths_2023 = get_paths(data_dict, '2023_11')
+    paths_2024 = get_paths(data_dict, '2024_03')
 
     # # list of paths to the summary directories for all microphones
-    # # summ_dir23 = [path for sublist in list(paths_2023.values())
-    # #               for path in sublist if 'summaries' in path]
-    # summ_dir24 = [path for sublist in list(paths_2024.values())
-    #               for path in sublist if 'summaries' in path]
+    summ_dir23 = [path for sublist in list(paths_2023.values())
+                  for path in sublist if 'summaries' in path]
+    summ_dir24 = [path for sublist in list(paths_2024.values())
+                  for path in sublist if 'summaries' in path]
 
-    # # find matches between summary files, save them and retain the path
-    # # summary_files_23 = match_summaries(summ_dir23, dataset_root)
-    # summary_files_24 = match_summaries(summ_dir24, dataset_root)
+    # find matches between summary files, save them and retain the path
+    summary_files_23 = match_summaries(summ_dir23, dataset_root)
+    summary_files_24 = match_summaries(summ_dir24, dataset_root)
 
-    # # copy matching recordings from raw data to dataset folders
-    # # recordings_23 = get_recordings(data_dict, data_root, dataset_root, summary_files_23)
-    # recordings_24 = get_recordings(data_dict, data_root, dataset_root, summary_files_24)
+    # copy matching recordings from raw data to dataset folders
+    recordings_23 = get_recordings(data_dict, data_root, dataset_root, summary_files_23)
+    recordings_24 = get_recordings(data_dict, data_root, dataset_root, summary_files_24)
 
-    # # specs_23 = create_spectrograms(recordings_23, n_fft=4096,
-    # #                                dataset_root=dataset_root, verbose=True)
-    # specs_24 = create_spectrograms(recordings_24, n_fft=4096,
-    #                                dataset_root=dataset_root, verbose=True)
-    specs_24 = ['data/spectrograms/2024_03/PLI2', 'data/spectrograms/2024_03/PLI1', 'data/spectrograms/2024_03/PLI3']
+    specs_23 = create_spectrograms(recordings_23, n_fft=4096,
+                                   dataset_root=dataset_root, verbose=True)
+    specs_24 = create_spectrograms(recordings_24, n_fft=4096,
+                                   dataset_root=dataset_root, verbose=True)
+    # specs_24 = ['data/spectrograms/2024_03/PLI2', 'data/spectrograms/2024_03/PLI1', 'data/spectrograms/2024_03/PLI3']
 
     spec_paths = []
-    # spec_paths.extend(specs_23)
+    spec_paths.extend(specs_23)
     spec_paths.extend(specs_24)
     paired_spectrograms = pair_spectrograms(spec_paths)
     stitch_images(paired_spectrograms, dataset_root)
