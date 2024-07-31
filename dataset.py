@@ -510,5 +510,3 @@ def create_dataset(data_root: str, dataset_root: str):
     paired_spectrograms = pair_spectrograms(spec_paths)
     # stich the images together to create the cGAN dataset
     stitch_images(paired_spectrograms, dataset_root)
-
-
