@@ -19,9 +19,10 @@ class CGANDataset(Dataset):
         else:
             self.transforms = v2.Compose([
                 v2.ToImage(),
-                v2.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
+                v2.Normalize(mean=[0.5], std=[0.5]),
                 v2.ToDtype(torch.float32, scale=True)
             ])
+        self.canvas_size = 4096
 
     def __len__(self):
         return len(self.data)
@@ -43,14 +44,24 @@ class CGANDataset(Dataset):
             np_arr = self.transforms(np_arr)
             return np_arr
 
-        image_path = self.data[index]
-        image = Image.open(image_path).convert('L')
-        image_width, _ = image.size
-        image_width = image_width // 2
-        image_arr = np.array(image)
-        image_arr = np.expand_dims(image_arr, axis=-1)
+        img_path = self.data[index]
+        img = Image.open(img_path).convert('L')
+        img_arr = np.array(img)
+        img_height, img_width = img_arr.shape
+        pad_height = max(0, self.canvas_size - img_height)
+        pad_width = max(0, self.canvas_size - img_width)
+        padded_img = np.pad(img_arr, ((0, pad_height), (0, pad_width)),
+                            mode='constant', constant_values=255)
+        padded_img = np.expand_dims(padded_img, axis=-1)
+        half_width = self.canvas_size // 2
         # extract left half of the image
-        input_arr = image_arr[:, :image_width, :]
+        input_arr = padded_img[:, :half_width, :]
         # extract right half of the image
-        target_arr = image_arr[:, image_width:, :]
-        return convert_permute_transform(input_arr), convert_permute_transform(target_arr)
+        target_arr = padded_img[:, half_width:, :]
+
+        if input_arr.shape[1] != target_arr.shape[1]:
+            raise Exception(f'Shape mismatch. {input_arr.shape}, {target_arr.shape}')
+
+        input_tensor = convert_permute_transform(input_arr)
+        target_tensor = convert_permute_transform(target_arr)
+        return input_tensor, target_tensor

@@ -18,7 +18,7 @@ class CNNBlock(nn.Module):
 class Discriminator(nn.Module):
     def __init__(self, in_ch: int, features=[64, 128, 256, 512]):
         super().__init__()
-        self.input_layer = nn.Sequential(
+        self.input = nn.Sequential(
             nn.Conv2d(in_ch * 2,
                       features[0],
                       kernel_size=4,
@@ -41,5 +41,6 @@ class Discriminator(nn.Module):
 
     def forward(self, x, y):
         x = torch.cat([x, y], dim=1)
-        x = self.input_layer(x)
-        return self.model(x)
+        x = self.input(x)
+        x = self.model(x)
+        return x
