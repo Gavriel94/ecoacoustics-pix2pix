@@ -424,7 +424,7 @@ def stitch_images(paired_spectrogram_paths: list[tuple], dataset_root: str):
         return x
 
     os.makedirs(f'{dataset_root}dataset', exist_ok=True)
-    separator_width = 10
+    separator_width = 0
     separator_colour = (255, 255, 255)
     for i, pair in enumerate(paired_spectrogram_paths):
         smmicro_path = pair[0]
@@ -510,6 +510,3 @@ def create_dataset(data_root: str, dataset_root: str):
     paired_spectrograms = pair_spectrograms(spec_paths)
     # stich the images together to create the cGAN dataset
     stitch_images(paired_spectrograms, dataset_root)
-
-
-create_dataset(data_root='raw_data/', dataset_root='data/')
