@@ -4,7 +4,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 
 from dataset import create_dataset
-from cGAN.dataset import CGANDataset
+from cGAN.dataset import SpectrogramDataset
 import cGAN.utilities as utils
 from cGAN import config as cfg
 from cGAN.train import train_model
@@ -29,25 +29,25 @@ def main():
                        verbose=True)
 
     # initialise DataLoaders
-    files = utils.get_files(DATASET_PATH)
+    files = utils.get_files(DATASET_PATH, include_correlated=False)
     train, val, test = utils.split_data(files, 0.8)
 
-    train_dataset = CGANDataset(train, augment=False)
-    # val_dataset = CGANDataset(val, augment=False)
-    # test_dataset = CGANDataset(test, augment=False)
+    train_dataset = SpectrogramDataset(train, augment=False)
+    val_dataset = SpectrogramDataset(val, augment=False)
+    test_dataset = SpectrogramDataset(test, augment=False)
 
     train_loader = DataLoader(train_dataset,
                               batch_size=cfg.BATCH_SIZE,
                               num_workers=cfg.NUM_WORKERS,
                               shuffle=True)
-    # val_loader = DataLoader(val_dataset,
-    #                         batch_size=cfg.BATCH_SIZE,
-    #                         num_workers=cfg.NUM_WORKERS,
-    #                         shuffle=False)
-    # test_loader = DataLoader(test_dataset,
-    #                          batch_size=cfg.BATCH_SIZE,
-    #                          num_workers=cfg.NUM_WORKERS,
-    #                          shuffle=False)
+    val_loader = DataLoader(val_dataset,
+                            batch_size=cfg.BATCH_SIZE,
+                            num_workers=cfg.NUM_WORKERS,
+                            shuffle=False)
+    test_loader = DataLoader(test_dataset,
+                             batch_size=cfg.BATCH_SIZE,
+                             num_workers=cfg.NUM_WORKERS,
+                             shuffle=False)
 
     disc = Discriminator(in_ch=1).to(cfg.DEVICE)
     gen = Generator(in_ch=1, features=64).to(cfg.DEVICE)
