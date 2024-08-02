@@ -20,7 +20,13 @@ DATASET_PATH = f'{DATASET_ROOT}dataset'
 def main():
     if not os.path.isdir(DATASET_PATH) or len(os.listdir(DATASET_PATH)) == 0:
         print('Creating a new dataset in \'data/\'')
-        create_dataset(data_root='raw_data/', dataset_root='data/')
+        create_dataset(data_root='raw_data/',
+                       dataset_root='data/',
+                       analysis=False,
+                       matched_summaries=cfg.MATCHED_SUMMARIES,
+                       copied_recordings=cfg.COPIED_RECORDINGS,
+                       spectrogram_paths=cfg.SPECTROGRAM_PATHS,
+                       verbose=True)
 
     # initialise DataLoaders
     files = utils.get_files(DATASET_PATH)
