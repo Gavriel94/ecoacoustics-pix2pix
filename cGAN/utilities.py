@@ -11,11 +11,14 @@ import random
 import torch
 
 
-def get_files(dataset_path):
+def get_files(dataset_path: str, include_correlated: bool):
     """
     Returns a list file paths to each image in the dataset.
     """
     files = os.listdir(dataset_path)
+    if include_correlated:
+        files.extend(os.listdir(os.path.join(dataset_path, 'correlated')))
+    files = [file for file in files if file.endswith('.png')]
     files_complete = [os.path.join(dataset_path, file) for file in files]
     return files_complete
 
