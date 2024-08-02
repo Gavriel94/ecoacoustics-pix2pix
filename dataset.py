@@ -344,7 +344,7 @@ def create_spectrograms(directories: list,
                 continue
             if verbose:
                 logging.info(f'Generating spectrogram for {file}, '
-                      f'{i + 1}/{len(files)} files')
+                             f'{i + 1}/{len(files)} files')
             path = os.path.join(directory, file)
             try:
                 y, sr = librosa.load(path)
