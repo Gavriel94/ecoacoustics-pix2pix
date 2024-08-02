@@ -4,5 +4,4 @@ pandas
 librosa
 soundfile
 Pillow
-imageio
 scipy

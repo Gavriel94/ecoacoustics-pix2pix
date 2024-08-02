@@ -1,7 +1,6 @@
 import pandas as pd
 import os
 import librosa
-import imageio
 import numpy as np
 import platform
 import shutil
@@ -314,6 +313,7 @@ def get_recordings(data_dict: dict,
 def create_spectrograms(directories: list,
                         n_fft: int,
                         dataset_root: str,
+                        target_width: int = 512,
                         hop_length: int = None,
                         labels: bool = None,
                         verbose: bool = False):
@@ -353,8 +353,8 @@ def create_spectrograms(directories: list,
                                               f'{dataset_root}spectrograms/')
                 os.makedirs(save_path, exist_ok=True)
                 # save image
-                imageio.imwrite(f"{save_path}/{file.replace('.wav', '.png')}",
-                                s_db_norm)
+                image = Image.fromarray(s_db_norm)
+                image.save(f"{save_path}/{file.replace('.wav', '.png')}")
                 save_paths.add(save_path)
             except Exception as e:
                 print(str(e))
@@ -423,49 +423,74 @@ def stitch_images(paired_spectrogram_paths: list[tuple], dataset_root: str):
         y, x = np.unravel_index(np.argmax(correlation), correlation.shape)
         return x
 
+    def have_same_dimensions(spec1, spec2):
+        return spec1.shape == spec2.shape
+
     os.makedirs(f'{dataset_root}dataset', exist_ok=True)
     separator_width = 0
     separator_colour = (255, 255, 255)
+    correlated = False
     for i, pair in enumerate(paired_spectrogram_paths):
-        smmicro_path = pair[0]
-        sm4_path = pair[1]
+        smmicro_path, sm4_path = pair
         # load spectrograms as np arrays
         smm_spec = load_spectrogram_as_np_arr(smmicro_path)
         sm4_spec = load_spectrogram_as_np_arr(sm4_path)
-        # align them using cross correlation
-        offset = cross_correlate(smm_spec, sm4_spec)
-        # trim spectrograms so they're the same length
-        if offset > 0:
-            aligned_smmicro = smm_spec[:, offset:]
-            aligned_sm4 = sm4_spec[:, :aligned_smmicro.shape[1]]
-        else:
-            aligned_sm4 = sm4_spec[:, -offset:]
-            aligned_smmicro = smm_spec[:, :aligned_sm4.shape[1]]
+        if not have_same_dimensions(smm_spec, sm4_spec):
+            # align them using cross correlation
+            offset = cross_correlate(smm_spec, sm4_spec)
+            correlated = True
+            # trim spectrograms so they're the same length
+            if offset > 0:
+                smm_spec = smm_spec[:, offset:]
+                sm4_spec = sm4_spec[:, :smm_spec.shape[1]]
+            else:
+                sm4_spec = sm4_spec[:, -offset:]
+                smm_spec = smm_spec[:, :sm4_spec.shape[1]]
 
         # get dimensions
-        smmicro_width, smmicro_height = aligned_smmicro.shape[1], aligned_smmicro.shape[0]
-        sm4_width, sm4_height = aligned_sm4.shape[1], aligned_sm4.shape[0]
+        smmicro_height, smmicro_width = smm_spec.shape
+        sm4_height, sm4_width = sm4_spec.shape
 
-        # ensure heights are the same
-        if smmicro_height != sm4_height:
-            raise ValueError("Aligned spectrograms have different heights")
-        extended_width = smmicro_width + sm4_width + separator_width
+        # ensure widths are the same
+        min_width = min(smmicro_width, sm4_width)
+        smm_spec = smm_spec[:, :min_width]
+        sm4_spec = sm4_spec[:, :min_width]
+
+        if not have_same_dimensions(smm_spec, sm4_spec):
+            raise IndexError('Spectrograms have different dimensions')
+
+        extended_width = smmicro_width * 2 + separator_width
         height = smmicro_height
 
         # stiched aligned spectrograms on the same canvas
         # with SMMicro on the left and SM4 on the right
         stitched = Image.new('RGB', (extended_width, height), separator_colour)
-        aligned_smmicro_img = Image.fromarray(aligned_smmicro)
-        aligned_sm4_img = Image.fromarray(aligned_sm4)
-        stitched.paste(aligned_smmicro_img, (0, 0))
-        stitched.paste(aligned_sm4_img, (smmicro_width + separator_width, 0))
+        smm_spec_img = Image.fromarray(smm_spec)
+        sm4_spec_img = Image.fromarray(sm4_spec)
+        stitched.paste(smm_spec_img, (0, 0))
+        stitched.paste(sm4_spec_img, (smmicro_width + separator_width, 0))
         datetime = smmicro_path.split('/')[-1]  # includes '.png' at the end
-        output_dir = os.path.join(dataset_root, 'dataset', datetime)
-        stitched.save(output_dir)
-        print(f'Stiched {i + 1}/{len(paired_spectrogram_paths)} images')
+        if correlated:
+            os.makedirs(f'{dataset_root}dataset/correlated', exist_ok=True)
+            output_dir = os.path.join(dataset_root, 'dataset', 'correlated', datetime)
+        else:
+            output_dir = os.path.join(dataset_root, 'dataset', datetime)
+        try:
+            stitched.save(output_dir)
+        except SystemError as se:
+            # likely that images are larger than the canvas
+            print(str(se))
+            print('Likely dimensions mismatch')
+            print(f'Input dimensions (w x h): {smmicro_width, smmicro_height}\n'
+                  f'Target dimensions (w x h):{sm4_width, sm4_height}\n'
+                  f'Canvas size (w x h): {stitched.width, stitched.height}')
+        except Exception as e:
+            print(str(e))
+        correlated = False
+        print(f'Stitched {i + 1}/{len(paired_spectrogram_paths)} images')
 
 
-def create_dataset(data_root: str, dataset_root: str):
+def create_dataset(data_root: str, dataset_root: str, recordings_paths: list | None = None, spectrogram_paths: list | None = None):
     # remove hidden files from macOS or Windows systems
     if platform.system() == 'Darwin' or platform.system() == 'Windows':
         remove_hidden_files(data_root)
@@ -474,7 +499,7 @@ def create_dataset(data_root: str, dataset_root: str):
     os.makedirs(dataset_root, exist_ok=True)
 
     # list metrics for each recording and save them in the dataset folder
-    analyse_recordings(data_root, dataset_root, verbose=True)
+    analyse_recordings(data_root, dataset_root)
 
     # organise the data by year and microphone
     data_dict = create_data_dict(data_root, dataset_root)
