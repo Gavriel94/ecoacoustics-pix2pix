@@ -8,7 +8,7 @@ import cGAN.utilities as utils
 
 # Creating the dataset can be a lengthy process.
 # By saving these variables, it's possible to shortcut some of the process
-# Set these to None if the dataset has not yet been created.
+# Ensure you've set these to None if the dataset has not yet been created.
 MATCHED_SUMMARIES = [['data/2024_03/PLI1/summary.csv',
                       'data/2024_03/PLI2/summary.csv',
                       'data/2024_03/PLI3/summary.csv'],
