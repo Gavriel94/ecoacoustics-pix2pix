@@ -9,6 +9,14 @@ Utility functions
 import os
 import random
 import torch
+import matplotlib.pyplot as plt
+
+
+def plot_loss(disc_loss, gen_loss, l1_loss):
+    plt.plot(disc_loss)
+    plt.plot(gen_loss)
+    plt.plot(l1_loss)
+    plt.show()
 
 
 def get_files(dataset_path: str, include_correlated: bool):

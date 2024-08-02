@@ -16,6 +16,7 @@ def custom_l1_loss(input, target, padding_value=0):
 
 
 def train_model(disc, gen, train_loader, optim_disc, optim_gen, l1_loss, bce_logits):
+    disc_loss, gen_loss, l1_loss = [], [], []
     for epoch in range(cfg.NUM_EPOCHS):
         disc.train()
         gen.train()
@@ -50,3 +51,8 @@ def train_model(disc, gen, train_loader, optim_disc, optim_gen, l1_loss, bce_log
                 'G_loss': G_loss.item(),
                 'L1_loss': L1.item()
             })
+            disc_loss.append(D_loss.item())
+            gen_loss.append(G_loss.item())
+            l1_loss.append(L1.item())
+
+    return disc_loss, gen_loss, l1_loss
