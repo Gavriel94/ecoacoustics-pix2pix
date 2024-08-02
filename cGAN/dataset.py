@@ -5,7 +5,7 @@ from PIL import Image
 import numpy as np
 
 
-class CGANDataset(Dataset):
+class SpectrogramDataset(Dataset):
     def __init__(self, data: list, augment: bool):
         self.data = data
         if augment:
@@ -22,7 +22,7 @@ class CGANDataset(Dataset):
                 v2.Normalize(mean=[0.5], std=[0.5]),
                 v2.ToDtype(torch.float32, scale=True)
             ])
-        self.canvas_size = 4096
+        self.canvas_size = 512
 
     def __len__(self):
         return len(self.data)
@@ -48,8 +48,17 @@ class CGANDataset(Dataset):
         img = Image.open(img_path).convert('L')
         img_arr = np.array(img)
         img_height, img_width = img_arr.shape
-        pad_height = max(0, self.canvas_size - img_height)
-        pad_width = max(0, self.canvas_size - img_width)
+
+        scale = min(self.canvas_size / img_width, self.canvas_size / img_height)
+        scaled_width = int(img_width * scale)
+        scaled_height = int(img_height * scale)
+
+        resized_img = Image.fromarray(img_arr).resize((scaled_width, scaled_height),
+                                                      Image.LANCZOS)
+        img_arr = np.array(resized_img)
+
+        pad_height = max(0, self.canvas_size - scaled_height)
+        pad_width = max(0, self.canvas_size - scaled_width)
         padded_img = np.pad(img_arr, ((0, pad_height), (0, pad_width)),
                             mode='constant', constant_values=255)
         padded_img = np.expand_dims(padded_img, axis=-1)
