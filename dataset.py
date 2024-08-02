@@ -1,15 +1,20 @@
 import pandas as pd
 import os
 import librosa
-import imageio
 import numpy as np
 import platform
 import shutil
 import json
 from PIL import Image
 from scipy.signal import correlate2d
+import logging
 
 from audio_analysis import analyse_recordings
+
+logging.basicConfig(format='%(asctime)s:%(message)s',
+                    level=logging.INFO,
+                    datefmt='%m/%d/%Y %I:%M:%S %p')
+logging.getLogger('PIL').setLevel(logging.WARNING)
 
 
 def remove_hidden_files(data_path: str):
@@ -24,8 +29,8 @@ def remove_hidden_files(data_path: str):
                 try:
                     os.remove(file_path)
                 except Exception as e:
-                    print(f'Error removing {file_path}: {e}')
-                    print('Perhaps try manually removing.')
+                    logging.error(f'Error removing {file_path}: {e}.\n'
+                                  'Try removing manually.')
 
 
 def create_data_dict(data_from: str, data_to: str, save_json=True):
@@ -101,7 +106,7 @@ def validate_summary_folder(year_mic_path: str):
     if 'summaries' not in os.listdir(year_mic_path):
         for loc in os.listdir(year_mic_path):
             dest = os.path.join(year_mic_path, loc)
-            print(f'Creating summary for {dest}')
+            logging.info(f'Creating summary for {dest}')
             create_summary_file(dest)
     return os.path.join(year_mic_path, 'summaries')
 
@@ -155,7 +160,7 @@ def create_summary_file(dir_path: str):
     # emulate .txt file name format from other summaries
     file_name = location + '_Summary_' + first_date + '_' + last_date + '.txt'
     file_path = (folder_path + '/' + file_name)
-    print(f'Summary file generated\nSaved in {file_path}\n')
+    logging.info(f'Summary file generated\nSaved in {file_path}\n')
     df.to_csv(file_path, index=False)
 
 
@@ -197,7 +202,7 @@ def format_file_name(file_name: str):
     return date, time
 
 
-def match_summaries(summary_dir: list, data_to: str):
+def match_summaries(summary_dir: list, data_to: str, verbose: bool = False):
     """
     Finds matching times from different microphones for each location-based
     summary file.
@@ -226,13 +231,14 @@ def match_summaries(summary_dir: list, data_to: str):
                      os.path.join(summary_dir[1], pair[1])) for pair in paired]
     summaries = []
     for pair in paired_paths:
-        sm4_path = pair[0]
-        smmicro_path = pair[1]
+        sm4_path, smmicro_path = pair
         matches = match_times(sm4_path, smmicro_path)
         dir_path = create_save_dir(data_to)
         save_path = dir_path + '/summary.csv'
         matches.to_csv(save_path)
         summaries.append(save_path)
+        if verbose:
+            logging.info(f'Saved matches from {pair} to {save_path}')
     return summaries
 
 
@@ -303,17 +309,18 @@ def get_recordings(data_dict: dict,
                             recording = os.path.join(folder, file)
                             save_path = f'{dataset_root}{year}/{location}'
                             if verbose:
-                                print(f'Copying {recording} to {save_path}')
+                                logging.info(f'Copying {recording} to {save_path}')
                             shutil.copy(recording, save_path)
                             save_paths.add(save_path)
                         except FileNotFoundError as e:
-                            print(str(e))
+                            logging.error(str(e))
     return list(save_paths)
 
 
 def create_spectrograms(directories: list,
                         n_fft: int,
-                        dataset_root: str,
+                        root: str,
+                        target_width: int = 512,
                         hop_length: int = None,
                         labels: bool = None,
                         verbose: bool = False):
@@ -336,7 +343,7 @@ def create_spectrograms(directories: list,
             if file.split('.')[-1] == 'csv':
                 continue
             if verbose:
-                print(f'Generating spectrogram for {file}, '
+                logging.info(f'Generating spectrogram for {file}, '
                       f'{i + 1}/{len(files)} files')
             path = os.path.join(directory, file)
             try:
@@ -349,15 +356,15 @@ def create_spectrograms(directories: list,
                 s_db_norm = s_db_norm.astype(np.uint8)
 
                 # create path and directory
-                save_path = directory.replace(f'{dataset_root}',
-                                              f'{dataset_root}spectrograms/')
+                save_path = directory.replace(f'{root}',
+                                              f'{root}spectrograms/')
                 os.makedirs(save_path, exist_ok=True)
                 # save image
-                imageio.imwrite(f"{save_path}/{file.replace('.wav', '.png')}",
-                                s_db_norm)
+                image = Image.fromarray(s_db_norm)
+                image.save(f"{save_path}/{file.replace('.wav', '.png')}")
                 save_paths.add(save_path)
             except Exception as e:
-                print(str(e))
+                logging.error(str(e))
     return list(save_paths)
 
 
@@ -423,49 +430,79 @@ def stitch_images(paired_spectrogram_paths: list[tuple], dataset_root: str):
         y, x = np.unravel_index(np.argmax(correlation), correlation.shape)
         return x
 
+    def have_same_dimensions(spec1, spec2):
+        return spec1.shape == spec2.shape
+
     os.makedirs(f'{dataset_root}dataset', exist_ok=True)
     separator_width = 0
     separator_colour = (255, 255, 255)
+    correlated = False
     for i, pair in enumerate(paired_spectrogram_paths):
-        smmicro_path = pair[0]
-        sm4_path = pair[1]
+        smmicro_path, sm4_path = pair
         # load spectrograms as np arrays
         smm_spec = load_spectrogram_as_np_arr(smmicro_path)
         sm4_spec = load_spectrogram_as_np_arr(sm4_path)
-        # align them using cross correlation
-        offset = cross_correlate(smm_spec, sm4_spec)
-        # trim spectrograms so they're the same length
-        if offset > 0:
-            aligned_smmicro = smm_spec[:, offset:]
-            aligned_sm4 = sm4_spec[:, :aligned_smmicro.shape[1]]
-        else:
-            aligned_sm4 = sm4_spec[:, -offset:]
-            aligned_smmicro = smm_spec[:, :aligned_sm4.shape[1]]
+        if not have_same_dimensions(smm_spec, sm4_spec):
+            # align them using cross correlation
+            offset = cross_correlate(smm_spec, sm4_spec)
+            correlated = True
+            # trim spectrograms so they're the same length
+            if offset > 0:
+                smm_spec = smm_spec[:, offset:]
+                sm4_spec = sm4_spec[:, :smm_spec.shape[1]]
+            else:
+                sm4_spec = sm4_spec[:, -offset:]
+                smm_spec = smm_spec[:, :sm4_spec.shape[1]]
 
         # get dimensions
-        smmicro_width, smmicro_height = aligned_smmicro.shape[1], aligned_smmicro.shape[0]
-        sm4_width, sm4_height = aligned_sm4.shape[1], aligned_sm4.shape[0]
+        smmicro_height, smmicro_width = smm_spec.shape
+        sm4_height, sm4_width = sm4_spec.shape
 
-        # ensure heights are the same
-        if smmicro_height != sm4_height:
-            raise ValueError("Aligned spectrograms have different heights")
-        extended_width = smmicro_width + sm4_width + separator_width
+        # ensure widths are the same
+        min_width = min(smmicro_width, sm4_width)
+        smm_spec = smm_spec[:, :min_width]
+        sm4_spec = sm4_spec[:, :min_width]
+
+        if not have_same_dimensions(smm_spec, sm4_spec):
+            raise IndexError('Spectrograms have different dimensions')
+
+        extended_width = smmicro_width * 2 + separator_width
         height = smmicro_height
 
         # stiched aligned spectrograms on the same canvas
         # with SMMicro on the left and SM4 on the right
         stitched = Image.new('RGB', (extended_width, height), separator_colour)
-        aligned_smmicro_img = Image.fromarray(aligned_smmicro)
-        aligned_sm4_img = Image.fromarray(aligned_sm4)
-        stitched.paste(aligned_smmicro_img, (0, 0))
-        stitched.paste(aligned_sm4_img, (smmicro_width + separator_width, 0))
+        smm_spec_img = Image.fromarray(smm_spec)
+        sm4_spec_img = Image.fromarray(sm4_spec)
+        stitched.paste(smm_spec_img, (0, 0))
+        stitched.paste(sm4_spec_img, (smmicro_width + separator_width, 0))
         datetime = smmicro_path.split('/')[-1]  # includes '.png' at the end
-        output_dir = os.path.join(dataset_root, 'dataset', datetime)
-        stitched.save(output_dir)
-        print(f'Stiched {i + 1}/{len(paired_spectrogram_paths)} images')
+        if correlated:
+            os.makedirs(f'{dataset_root}dataset/correlated', exist_ok=True)
+            output_dir = os.path.join(dataset_root, 'dataset', 'correlated', datetime)
+        else:
+            output_dir = os.path.join(dataset_root, 'dataset', datetime)
+        try:
+            stitched.save(output_dir)
+        except SystemError as se:
+            # likely that images are larger than the canvas
+            logging.error(f'{str(se)}\nLikely dimensions mismatch'
+                          f'Input dimensions (w x h): {smmicro_width, smmicro_height}\n'
+                          f'Target dimensions (w x h):{sm4_width, sm4_height}\n'
+                          f'Canvas size (w x h): {stitched.width, stitched.height}')
+        except Exception as e:
+            logging.error(str(e))
+        correlated = False
+        logging.info(f'Stitched {i + 1}/{len(paired_spectrogram_paths)} images')
 
 
-def create_dataset(data_root: str, dataset_root: str):
+def create_dataset(data_root: str,
+                   dataset_root: str,
+                   analysis: bool,
+                   matched_summaries: list | None = None,
+                   copied_recordings: list | None = None,
+                   spectrogram_paths: list | None = None,
+                   verbose: bool = True):
     # remove hidden files from macOS or Windows systems
     if platform.system() == 'Darwin' or platform.system() == 'Windows':
         remove_hidden_files(data_root)
@@ -473,40 +510,55 @@ def create_dataset(data_root: str, dataset_root: str):
     # create a directory to store the dataset in
     os.makedirs(dataset_root, exist_ok=True)
 
-    # list metrics for each recording and save them in the dataset folder
-    analyse_recordings(data_root, dataset_root, verbose=True)
+    if analysis:
+        logging.debug('Analysing recordings')
+        # list metrics for each recording and save them in the dataset folder
+        analyse_recordings(data_root, dataset_root, verbose)
 
-    # organise the data by year and microphone
+    # organise data by year and microphone
     data_dict = create_data_dict(data_root, dataset_root)
 
-    # # get paths to all data in each year, organised by microphone
-    paths_2023 = get_paths(data_dict, '2023_11')
-    paths_2024 = get_paths(data_dict, '2024_03')
+    # get summary files by date
+    summary_paths = {}
+    for date, mics in data_dict.items():
+        for mic, paths in mics.items():
+            for path in paths:
+                if 'summaries' in path:
+                    if date not in summary_paths:
+                        summary_paths[date] = []
+                    summary_paths[date].append(path)
 
-    # # list of paths to the summary directories for all microphones
-    summ_dir23 = [path for sublist in list(paths_2023.values())
-                  for path in sublist if 'summaries' in path]
-    summ_dir24 = [path for sublist in list(paths_2024.values())
-                  for path in sublist if 'summaries' in path]
+    if matched_summaries is None:
+        if summary_paths is None:
+            raise UnboundLocalError('Summary paths were not generated.')
+        # generate CSV files listing matched recordings from data in summary files
+        logging.debug('Matching summaries')
+        matched_summaries = [match_summaries(summary_paths[year], dataset_root, verbose)
+                             for year in summary_paths.keys()]
 
-    # find matches between summary files, save them and retain the path
-    summary_files_23 = match_summaries(summ_dir23, dataset_root)
-    summary_files_24 = match_summaries(summ_dir24, dataset_root)
+    if copied_recordings is None:
+        if not matched_summaries:
+            raise UnboundLocalError('No matched summaries')
+        logging.debug('Copying recordings')
+        # copy matching recordings from raw data to dataset folders
+        copied_recordings = [get_recordings(data_dict, data_root,
+                                            dataset_root, summary_file)
+                             for summary_file in matched_summaries]
 
-    # copy matching recordings from raw data to dataset folders
-    recordings_23 = get_recordings(data_dict, data_root, dataset_root, summary_files_23)
-    recordings_24 = get_recordings(data_dict, data_root, dataset_root, summary_files_24)
+    if spectrogram_paths is None:
+        if not copied_recordings:
+            raise UnboundLocalError('No paths to recordings')
+        logging.debug('Creating spectrograms')
+        spectrogram_paths = [create_spectrograms(audio, n_fft=4096,
+                                                 root=dataset_root, verbose=verbose)
+                             for audio in copied_recordings]
 
-    specs_23 = create_spectrograms(recordings_23, n_fft=4096,
-                                   dataset_root=dataset_root, verbose=True)
-    specs_24 = create_spectrograms(recordings_24, n_fft=4096,
-                                   dataset_root=dataset_root, verbose=True)
+    # # merge all available spectrograms into one list
+    spectrogram_paths = [path for sublist in spectrogram_paths for path in sublist]
 
-    # merge all available spectrograms into one list
-    spec_paths = []
-    spec_paths.extend(specs_23)
-    spec_paths.extend(specs_24)
     # find matching pairs by pathname
-    paired_spectrograms = pair_spectrograms(spec_paths)
+    paired_spectrograms = pair_spectrograms(spectrogram_paths)
+
+    logging.debug('Stiching images')
     # stich the images together to create the cGAN dataset
     stitch_images(paired_spectrograms, dataset_root)
