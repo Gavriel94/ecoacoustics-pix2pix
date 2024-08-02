@@ -1,18 +1,24 @@
 import wave
 import os
 import pandas as pd
+import logging
+
+logging.basicConfig(format='%(asctime)s:%(message)s',
+                    level=logging.INFO,
+                    datefmt='%m/%d/%Y %I:%M:%S %p')
 
 
 def analyse_recordings(data_root: str, dataset_root: str, verbose: bool = False):
     """
     Record the number of channels, sample rate, number of frames, sample
     width and duration for all audio files.
-    Saves the data in the dataset folder, under the names of each microphone.
+    Aggregates the data from the same microphones to keep the number of 
+    files to a minimum.
 
     Args:
         data_root (str): Path to raw data.
         dataset_root (str): Path to the dataset.
-        verbose (bool, optional): Display a count of the files.
+        verbose (bool, optional): Output the save path.
     """
     os.makedirs(f'{dataset_root}analysis', exist_ok=True)
     for year_dir in os.listdir(data_root):
@@ -23,8 +29,9 @@ def analyse_recordings(data_root: str, dataset_root: str, verbose: bool = False)
                     continue
                 full_path = os.path.join(data_root, year_dir, mic_dir, loc_dir)
                 df = pd.concat([df, wav_data(full_path, verbose=verbose)], ignore_index=True)
-
-                df.to_csv(f'{dataset_root}analysis/{mic_dir}_data.csv', index=False)
+                save_path = f'{dataset_root}analysis/{mic_dir}_data.csv'
+                df.to_csv(save_path, index=False)
+                logging.info(f'Analysis saved in {save_path}')
 
 
 def get_dict(num_channels: int, sample_rate: int,
