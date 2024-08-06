@@ -11,6 +11,7 @@ By leveraging machine learning techniques, this study aims to identify differenc
 The path to the directory containing all of the raw data
 The data must be organised in this way
 
+```python
 raw_data/
 └── year/
     ├── microphone_1/
@@ -19,11 +20,13 @@ raw_data/
     └── microphone_2/
         ├── location_1/
         └── location_2/
+```
 
 ### DATASET_ROOT
 
 The dataset will be saved with this structure in the folder where you set `DATASET_ROOT` equal to a directory.
 
+```python
 data/
 ├── year/
 │   ├── location_1/
@@ -36,3 +39,8 @@ data/
     └── year/
         ├── location_1/
         └── location_2/
+```
+
+## Notes
+
+Generating small spectrograms make longer spectrograms squash and may increase inaccuracy. Would recommend not to use `correlated` if so.

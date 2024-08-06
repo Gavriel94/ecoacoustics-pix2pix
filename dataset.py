@@ -11,7 +11,6 @@ from scipy.signal import correlate2d
 # from pix2pix.config import setup_logging
 from audio_analysis import analyse_recordings
 import logging
-import pix2pix.utilities as utils
 
 # setup_logging()
 
@@ -324,7 +323,7 @@ def get_recordings(data_dict: dict,
 def create_spectrograms(directories: list,
                         n_fft: int,
                         root: str,
-                        target_width: int = 512,
+                        target_width: int,
                         hop_length: int = None,
                         labels: bool = None,
                         verbose: bool = False):
@@ -365,8 +364,15 @@ def create_spectrograms(directories: list,
                 os.makedirs(save_path, exist_ok=True)
                 # save image
                 image = Image.fromarray(s_db_norm)
-                image.save(f"{save_path}/{file.replace('.wav', '.png')}")
-                save_paths.add(save_path)
+
+                if target_width is not None:
+                    aspect_ratio = image.width / image.height
+                    target_height = int(target_width / aspect_ratio)
+                    image_resized = image.resize((target_width, target_height), Image.LANCZOS)
+                    image_resized.save(f"{save_path}/{file.replace('.wav', '.png')}")
+                else:
+                    image.save(f"{save_path}/{file.replace('.wav', '.png')}")
+                    save_paths.add(save_path)
             except Exception as e:
                 logging.error(str(e))
     return list(save_paths)
@@ -445,10 +451,7 @@ def stitch_images(paired_spectrogram_paths: list[tuple], dataset_root: str):
         # load spectrograms as np arrays
         smm_spec = load_spectrogram_as_np_arr(smmicro_path)
         sm4_spec = load_spectrogram_as_np_arr(sm4_path)
-        # * DEBUGGING
-        # print('saving images in tmp')
-        # utils.save_img_arr_in_tmp(smm_spec, smmicro_path)
-        # utils.save_img_arr_in_tmp(sm4_spec, sm4_path)
+
         if not have_same_dimensions(smm_spec, sm4_spec):
             # align them using cross correlation
             offset = cross_correlate(smm_spec, sm4_spec)
@@ -460,8 +463,6 @@ def stitch_images(paired_spectrogram_paths: list[tuple], dataset_root: str):
             else:
                 sm4_spec = sm4_spec[:, -offset:]
                 smm_spec = smm_spec[:, :sm4_spec.shape[1]]
-            utils.save_img_arr_in_tmp(smm_spec, smmicro_path, 'smm')
-            utils.save_img_arr_in_tmp(sm4_spec, sm4_path, 'sm4')
 
         # get dimensions
         smmicro_height, smmicro_width = smm_spec.shape
@@ -471,7 +472,6 @@ def stitch_images(paired_spectrogram_paths: list[tuple], dataset_root: str):
         min_width = min(smmicro_width, sm4_width)
         smm_spec = smm_spec[:, :min_width]
         sm4_spec = sm4_spec[:, :min_width]
-
         if not have_same_dimensions(smm_spec, sm4_spec):
             raise IndexError('Spectrograms have different dimensions')
 
@@ -508,6 +508,7 @@ def stitch_images(paired_spectrogram_paths: list[tuple], dataset_root: str):
 def create_dataset(data_root: str,
                    dataset_root: str,
                    analysis: bool,
+                   target_width: int | None = None,
                    matched_summaries: list | None = None,
                    copied_recordings: list | None = None,
                    spectrogram_paths: list | None = None,
@@ -559,7 +560,9 @@ def create_dataset(data_root: str,
             raise UnboundLocalError('No paths to recordings')
         logging.debug('Creating spectrograms')
         spectrogram_paths = [create_spectrograms(audio, n_fft=4096,
-                                                 root=dataset_root, verbose=verbose)
+                                                 root=dataset_root,
+                                                 target_width=target_width,
+                                                 verbose=verbose)
                              for audio in copied_recordings]
 
     # # merge all available spectrograms into one list
