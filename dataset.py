@@ -7,9 +7,13 @@ import shutil
 import json
 from PIL import Image
 from scipy.signal import correlate2d
-import logging
 
+# from pix2pix.config import setup_logging
 from audio_analysis import analyse_recordings
+import logging
+import pix2pix.utilities as utils
+
+# setup_logging()
 
 logging.basicConfig(format='%(asctime)s:%(message)s',
                     level=logging.INFO,
@@ -437,11 +441,13 @@ def stitch_images(paired_spectrogram_paths: list[tuple], dataset_root: str):
     separator_width = 0
     separator_colour = (255, 255, 255)
     correlated = False
-    for i, pair in enumerate(paired_spectrogram_paths):
-        smmicro_path, sm4_path = pair
+    for i, (smmicro_path, sm4_path) in enumerate(paired_spectrogram_paths):
         # load spectrograms as np arrays
         smm_spec = load_spectrogram_as_np_arr(smmicro_path)
         sm4_spec = load_spectrogram_as_np_arr(sm4_path)
+        print('saving images in tmp')
+        utils.save_img_arr_in_tmp(smm_spec)
+        utils.save_img_arr_in_tmp(sm4_spec)
         if not have_same_dimensions(smm_spec, sm4_spec):
             # align them using cross correlation
             offset = cross_correlate(smm_spec, sm4_spec)
@@ -560,5 +566,5 @@ def create_dataset(data_root: str,
     paired_spectrograms = pair_spectrograms(spectrogram_paths)
 
     logging.debug('Stiching images')
-    # stich the images together to create the cGAN dataset
+    # stich images together to create the dataset
     stitch_images(paired_spectrograms, dataset_root)
