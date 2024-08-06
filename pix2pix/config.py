@@ -1,14 +1,15 @@
 """
-Declare variables to shortcut parts of the dataset creation process and
-alter the cGAN configuration.
+Define paths for files used for creating the dataset and alter model hyperparameters.
 """
 
-import cGAN.utilities as utils
+import pix2pix.utilities as utils
+import os
+# import logging
 
+DATA_ROOT = 'raw_data/'
+DATASET_ROOT = 'data/'
+DATASET_PATH = os.path.join(DATASET_ROOT, 'dataset')
 
-# Creating the dataset can be a lengthy process.
-# By saving these variables, it's possible to shortcut some of the process
-# Ensure you've set these to None if the dataset has not yet been created.
 MATCHED_SUMMARIES = [['data/2024_03/PLI1/summary.csv',
                       'data/2024_03/PLI2/summary.csv',
                       'data/2024_03/PLI3/summary.csv'],
@@ -32,5 +33,12 @@ DEVICE = utils.set_device('mps')
 LEARNING_RATE = 2e-4
 BATCH_SIZE = 2
 NUM_WORKERS = 6
-NUM_EPOCHS = 3
+NUM_EPOCHS = 2
 L1_LAMBDA = 100
+
+
+# def setup_logging():
+#     logging.basicConfig(format='%(asctime)s:%(message)s',
+#                         level=logging.INFO,
+#                         datefmt='%m/%d/%Y %I:%M:%S %p')
+#     logging.getLogger('PIL').setLevel(logging.WARNING)

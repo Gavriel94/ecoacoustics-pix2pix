@@ -10,6 +10,14 @@ import os
 import random
 import torch
 import matplotlib.pyplot as plt
+from PIL import Image
+
+
+def save_img_arr_in_tmp(img_arr, img_path, mic_name):
+    image = Image.fromarray(img_arr)
+    save_path = img_path.split('/')[2]
+    image.save(f'tmp/{mic_name}-{save_path}.png')
+    
 
 
 def plot_loss(disc_loss, gen_loss, l1_loss):

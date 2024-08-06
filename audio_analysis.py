@@ -12,7 +12,7 @@ def analyse_recordings(data_root: str, dataset_root: str, verbose: bool = False)
     """
     Record the number of channels, sample rate, number of frames, sample
     width and duration for all audio files.
-    Aggregates the data from the same microphones to keep the number of 
+    Aggregates the data from the same microphones to keep the number of
     files to a minimum.
 
     Args:
@@ -70,7 +70,7 @@ def wav_data(directory_path: str, verbose: bool = False):
     dicts = []
     for i, file in enumerate(files):
         if verbose:
-            print(f'Analysing {file} {i + 1}/{len(files)} files')
+            logging.info(f'Analysing {file} {i + 1}/{len(files)} files')
         path = os.path.join(directory_path, file)
         try:
             with wave.open(path, 'rb') as w:

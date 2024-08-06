@@ -7,9 +7,13 @@ import shutil
 import json
 from PIL import Image
 from scipy.signal import correlate2d
-import logging
 
+# from pix2pix.config import setup_logging
 from audio_analysis import analyse_recordings
+import logging
+import pix2pix.utilities as utils
+
+# setup_logging()
 
 logging.basicConfig(format='%(asctime)s:%(message)s',
                     level=logging.INFO,
@@ -344,7 +348,7 @@ def create_spectrograms(directories: list,
                 continue
             if verbose:
                 logging.info(f'Generating spectrogram for {file}, '
-                      f'{i + 1}/{len(files)} files')
+                             f'{i + 1}/{len(files)} files')
             path = os.path.join(directory, file)
             try:
                 y, sr = librosa.load(path)
@@ -437,11 +441,14 @@ def stitch_images(paired_spectrogram_paths: list[tuple], dataset_root: str):
     separator_width = 0
     separator_colour = (255, 255, 255)
     correlated = False
-    for i, pair in enumerate(paired_spectrogram_paths):
-        smmicro_path, sm4_path = pair
+    for i, (smmicro_path, sm4_path) in enumerate(paired_spectrogram_paths):
         # load spectrograms as np arrays
         smm_spec = load_spectrogram_as_np_arr(smmicro_path)
         sm4_spec = load_spectrogram_as_np_arr(sm4_path)
+        # * DEBUGGING
+        # print('saving images in tmp')
+        # utils.save_img_arr_in_tmp(smm_spec, smmicro_path)
+        # utils.save_img_arr_in_tmp(sm4_spec, sm4_path)
         if not have_same_dimensions(smm_spec, sm4_spec):
             # align them using cross correlation
             offset = cross_correlate(smm_spec, sm4_spec)
@@ -453,6 +460,8 @@ def stitch_images(paired_spectrogram_paths: list[tuple], dataset_root: str):
             else:
                 sm4_spec = sm4_spec[:, -offset:]
                 smm_spec = smm_spec[:, :sm4_spec.shape[1]]
+            utils.save_img_arr_in_tmp(smm_spec, smmicro_path, 'smm')
+            utils.save_img_arr_in_tmp(sm4_spec, sm4_path, 'sm4')
 
         # get dimensions
         smmicro_height, smmicro_width = smm_spec.shape
@@ -560,5 +569,5 @@ def create_dataset(data_root: str,
     paired_spectrograms = pair_spectrograms(spectrogram_paths)
 
     logging.debug('Stiching images')
-    # stich the images together to create the cGAN dataset
+    # stich images together to create the dataset
     stitch_images(paired_spectrograms, dataset_root)
