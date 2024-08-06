@@ -445,9 +445,10 @@ def stitch_images(paired_spectrogram_paths: list[tuple], dataset_root: str):
         # load spectrograms as np arrays
         smm_spec = load_spectrogram_as_np_arr(smmicro_path)
         sm4_spec = load_spectrogram_as_np_arr(sm4_path)
-        print('saving images in tmp')
-        utils.save_img_arr_in_tmp(smm_spec)
-        utils.save_img_arr_in_tmp(sm4_spec)
+        # * DEBUGGING
+        # print('saving images in tmp')
+        # utils.save_img_arr_in_tmp(smm_spec, smmicro_path)
+        # utils.save_img_arr_in_tmp(sm4_spec, sm4_path)
         if not have_same_dimensions(smm_spec, sm4_spec):
             # align them using cross correlation
             offset = cross_correlate(smm_spec, sm4_spec)
@@ -459,6 +460,8 @@ def stitch_images(paired_spectrogram_paths: list[tuple], dataset_root: str):
             else:
                 sm4_spec = sm4_spec[:, -offset:]
                 smm_spec = smm_spec[:, :sm4_spec.shape[1]]
+            utils.save_img_arr_in_tmp(smm_spec, smmicro_path, 'smm')
+            utils.save_img_arr_in_tmp(sm4_spec, sm4_path, 'sm4')
 
         # get dimensions
         smmicro_height, smmicro_width = smm_spec.shape

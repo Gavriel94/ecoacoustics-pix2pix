@@ -15,14 +15,16 @@ from PIL import Image
 
 
 def main():
-    if not os.path.isdir(cfg.DATASET_PATH) or len(os.listdir(cfg.DATASET_PATH)) == 0:
+    create_new_dataset = True
+    
+    if create_new_dataset or not os.path.isdir(cfg.DATASET_PATH) or len(os.listdir(cfg.DATASET_PATH)) == 0:
         print('Creating a new dataset in \'data/\'')
         create_dataset(data_root='raw_data/',
                        dataset_root='data/',
                        analysis=False,
-                       matched_summaries=cfg.MATCHED_SUMMARIES,
-                       copied_recordings=cfg.COPIED_RECORDINGS,
-                       spectrogram_paths=cfg.SPECTROGRAM_PATHS,
+                       matched_summaries=cfg.MATCHED_SUMMARIES[:10],
+                       copied_recordings=cfg.COPIED_RECORDINGS[:10],
+                       spectrogram_paths=cfg.SPECTROGRAM_PATHS[:10],
                        verbose=True)
 
     # initialise DataLoaders

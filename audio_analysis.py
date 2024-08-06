@@ -70,7 +70,7 @@ def wav_data(directory_path: str, verbose: bool = False):
     dicts = []
     for i, file in enumerate(files):
         if verbose:
-            print(f'Analysing {file} {i + 1}/{len(files)} files')
+            logging.info(f'Analysing {file} {i + 1}/{len(files)} files')
         path = os.path.join(directory_path, file)
         try:
             with wave.open(path, 'rb') as w:
