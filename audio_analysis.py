@@ -7,6 +7,8 @@ logging.basicConfig(format='%(asctime)s:%(message)s',
                     level=logging.INFO,
                     datefmt='%m/%d/%Y %I:%M:%S %p')
 
+# save the phase information
+
 
 def analyse_recordings(data_root: str, dataset_root: str, verbose: bool = False):
     """
@@ -78,6 +80,7 @@ def wav_data(directory_path: str, verbose: bool = False):
                 sample_rate = w.getframerate()
                 frames = w.getnframes()
                 bit_depth = w.getsampwidth() * 8  # convert bytes to bits
+                
                 duration = frames / float(sample_rate)
                 dicts.append(get_dict(num_channels, sample_rate,
                              frames, bit_depth,
