@@ -7,3 +7,5 @@ __pychache__
 *.pyc
 data
 backups
+tmp
+pix2pix/evaluation
