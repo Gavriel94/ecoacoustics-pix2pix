@@ -1,3 +1,4 @@
+from ctypes import util
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -9,57 +10,53 @@ import numpy as np
 from datetime import datetime
 
 from . import config as cfg
+from . import utilities
 
 
-def rescale_image(image, original_width, original_height):
-    image = (image * 255).astype(np.uint8)
-    image = image.reshape(image.shape[0], image.shape[1])
-    return np.array(Image.fromarray(image).resize((original_width, original_height), Image.LANCZOS))
+def remove_tensor_padding(image_tensor, original_size):
+    _, padded_height, padded_width = image_tensor.shape
+    original_height, original_width = original_size
+
+    start_h = min(0, (padded_height - original_height) // 2)
+    start_w = min(0, (padded_width - original_width) // 2)
+
+    filtered = image_tensor[:, start_h:start_h+original_height, start_w:start_w+original_width]
+
+    print(f'start_h = ({padded_height} - {original_height}) // 2', f'{(padded_height - original_height) // 2}')
+    print(f'start_w = ({padded_width} - {original_width}) // 2', f'{(padded_width - original_width) // 2}')
+
+    """
+    start_h = (4096 - 2584) // 2 756
+    start_w = (2048 - 2049) // 2 -1
+    """
+
+    print('REMOVING TENSOR PADDING')
+    print('padded_height', padded_height)
+    print('padded_width', padded_width)
+    print('original_height', original_height)
+    print('original_width', original_width)
+
+    print('image_tensor.shape', image_tensor.shape)
+    print('original_size', original_size)
+    print('start_h', start_h)
+    print('start_w', start_w)
+    print('filtered', filtered)
+
+    return filtered
 
 
-def compare_target_to_generated(epoch, real_images, generated_images, original_dimensions, initial_time, output_dir: str = None):
-    if not output_dir:
-        output_dir = os.path.join('pix2pix', 'evaluation', f'{datetime.now().strftime("%d-%m-%Y")}', 'generated_images')
-    os.makedirs(output_dir, exist_ok=True)
-
-    # Normalize the images to [0, 1] range for saving
-    real_images = (real_images + 1) / 2.0
-    generated_images = (generated_images + 1) / 2.0
-
-    batch_size = real_images.size(0)
-    fig, axes = plt.subplots(batch_size, 2, figsize=(10, batch_size * 5))
-
-    for i, (real_image, generated_image) in enumerate(zip(real_images, generated_images)):
-        real_img = real_image.permute(1, 2, 0).cpu().detach().numpy()
-        gen_img = generated_image.permute(1, 2, 0).cpu().detach().numpy()
-
-        original_height, original_width = original_dimensions
-
-        real_img_rescaled = rescale_image(real_img, original_width, original_height)
-        gen_img_rescaled = rescale_image(gen_img, original_width, original_height)
-
-        if batch_size == 1:
-            ax_real, ax_gen = axes
-        else:
-            ax_real, ax_gen = axes[i]
-        ax_real.imshow(real_img)
-        ax_real.set_title('Real Image')
-        ax_real.axis('off')
-
-        ax_gen.imshow(gen_img)
-        ax_gen.set_title('Generated Image')
-        ax_gen.axis('off')
-
-        # save individual images
-        real_img_path = os.path.join(output_dir, f'target_{epoch}_{i}.png')
-        gen_img_path = os.path.join(output_dir, f'generated_{epoch}_{i}.png')
-        real_img_pil = Image.fromarray(real_img_rescaled).save(real_img_path)
-        gen_img_pil = Image.fromarray(gen_img_rescaled).save(gen_img_path)
-
-    plt.tight_layout()
-    os.makedirs(f"{output_dir}/compare_batch/", exist_ok=True)
-    plt.savefig(f"{output_dir}/compare_batch/epoch_{epoch}.png")
-    plt.close(fig)
+def crop_padding(img_arr, original_dimensions):
+    if img_arr.ndim == 3 and img_arr.shape[0] == 1:
+        img_arr = img_arr.squeeze(0)
+    original_height, original_width = original_dimensions
+    mask = img_arr != 1.0
+    rows, cols = np.any(mask, axis=1), np.any(mask, axis=0)
+    ymin, ymax = np.where(rows)[0][[0, -1]]
+    xmin, xmax = np.where(cols)[0][[0, -1]]
+    ymax = min(ymax + 1, original_height)
+    xmax = min(xmax + 1, original_width)
+    cropped = img_arr[ymin:ymax+1, xmin:xmax+1]
+    return cropped
 
 
 def custom_l1_loss(input, target, padding_value=0):
@@ -80,6 +77,10 @@ def train_model(disc, gen, train_loader, optim_disc, optim_gen, l1_loss, bce_log
         gen.train()
         train_loader_tqdm = tqdm(train_loader, leave=True)
         for idx, (input_img, target_img, original_dimensions) in enumerate(train_loader_tqdm):
+            print(input_img.shape)
+            utilities.save_img_tensor_in_tmp(input_img, f'input/{epoch}-{idx}')
+            utilities.save_img_tensor_in_tmp(target_img, f'target/{epoch}-{idx}')
+            
             input_img, target_img = input_img.to(cfg.DEVICE), target_img.to(cfg.DEVICE)
 
             # train discriminator
@@ -112,14 +113,19 @@ def train_model(disc, gen, train_loader, optim_disc, optim_gen, l1_loss, bce_log
             disc_loss.append(D_loss.item())
             gen_loss.append(G_loss.item())
             l1_loss.append(L1.item())
-
-        original_height = int(original_dimensions[0].item())
-        original_width = int(original_dimensions[1].item())
-        original_dims = (original_height, original_width)
-        compare_target_to_generated(epoch,
-                                    real_images=target_img,
-                                    generated_images=y_fake,
-                                    original_dimensions=original_dims,
-                                    initial_time=initial_time)
+            # print('DEBUGGING IN TRAIN')
+            # print('target type', type(target_img))
+            # print('target size', target_img.shape)
+            # print('gen type', type(y_fake))
+            # print('gen size', y_fake.shape)
+            # print('original_dimensions', original_dimensions)
+        print('y_fake[0].shape', y_fake[0].shape)
+        y_fake_exp = y_fake[0].unsqueeze(0)
+        utilities.save_img_tensor_in_tmp(y_fake_exp, f'generated_epoch_{epoch}')
+        # compare_target_to_generated(epoch,
+        #                             real_images=target_img,
+        #                             generated_images=y_fake,
+        #                             original_dimensions=original_dimensions,
+        #                             initial_time=initial_time)
 
     return disc_loss, gen_loss, l1_loss
