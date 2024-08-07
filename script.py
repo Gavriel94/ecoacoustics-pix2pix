@@ -48,15 +48,18 @@ def main():
     train_loader = DataLoader(train_dataset,
                               batch_size=cfg.BATCH_SIZE,
                               num_workers=cfg.NUM_WORKERS,
-                              shuffle=True)
+                              shuffle=True,
+                              collate_fn=utils.custom_collate)
     val_loader = DataLoader(val_dataset,
                             batch_size=cfg.BATCH_SIZE,
                             num_workers=cfg.NUM_WORKERS,
-                            shuffle=False)
+                            shuffle=False,
+                            collate_fn=utils.custom_collate)
     test_loader = DataLoader(test_dataset,
                              batch_size=cfg.BATCH_SIZE,
                              num_workers=cfg.NUM_WORKERS,
-                             shuffle=False)
+                             shuffle=False,
+                             collate_fn=utils.custom_collate)
 
     disc = Discriminator(in_ch=1).to(cfg.DEVICE)
     gen = Generator(in_ch=1, features=64).to(cfg.DEVICE)
