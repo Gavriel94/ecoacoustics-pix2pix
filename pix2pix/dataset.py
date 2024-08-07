@@ -16,13 +16,12 @@ class SpectrogramDataset(Dataset):
             v2.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
             v2.ToDtype(torch.float32, scale=True)
         ])
-        self.normalise = v2.Compose([
+        self.normalise_greyscale = v2.Compose([
             v2.ToImage(),
-            # v2.Normalize(mean=[0.5], std=[0.5])
+            v2.Normalize(mean=[0.5], std=[0.5])
         ])
         self.to_tensor = v2.Compose([
             v2.ToImage(),
-            # v2.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
             v2.ToDtype(torch.float32, scale=True)
         ])
 
@@ -73,7 +72,7 @@ class SpectrogramDataset(Dataset):
                 np_arr = np.expand_dims(np_arr, axis=-1)  # Add a channel dimension
             np_arr = torch.tensor(np_arr, dtype=torch.float32) / 255.0
             np_arr = np_arr.permute(2, 0, 1)
-            np_arr = self.normalise(np_arr)
+            np_arr = self.normalise_greyscale(np_arr)
             np_arr = self.to_tensor(np_arr)
             return np_arr
 
