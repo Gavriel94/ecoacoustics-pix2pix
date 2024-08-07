@@ -45,12 +45,19 @@ class Pix2PixDataset(Dataset):
         pad_right = pad_width - pad_left
         pad_top = pad_height // 2
         pad_bottom = pad_height - pad_top
+        
+        padding_coords = {
+            'left': pad_left,
+            'right': pad_right,
+            'top': pad_top,
+            'bottom': pad_bottom
+        }
 
         return np.pad(image_arr,
                       ((pad_top, pad_bottom),
                        (pad_left, pad_right)),
                       mode='constant',
-                      constant_values=255)
+                      constant_values=255), padding_coords
 
     def __len__(self):
         return len(self.data)
@@ -62,17 +69,18 @@ class Pix2PixDataset(Dataset):
 
         target_width, target_height = self.calculate_padding_dimensions(image_arr.shape)
 
-        padded_image = self.pad_image(image_arr,
-                                      target_width,
-                                      target_height)
+        padded_image, padding_coords = self.pad_image(image_arr,
+                                                      target_width,
+                                                      target_height)
 
         padded_input = padded_image[:, :padded_image.shape[1] // 2]
         padded_target = padded_image[:, padded_image.shape[1] // 2:]
 
         input_tensor = self.to_tensor(padded_input)
         target_tensor = self.to_tensor(padded_target)
+        original_size = image_arr.shape
 
-        return input_tensor, target_tensor
+        return input_tensor, target_tensor, original_size, padding_coords
 
 
 class NotTwoPower(Exception):
