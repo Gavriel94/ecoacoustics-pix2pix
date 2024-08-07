@@ -22,24 +22,28 @@ def analyse_recordings(data_root: str, dataset_root: str, verbose: bool = False)
         dataset_root (str): Path to the dataset.
         verbose (bool, optional): Output the save path.
     """
-    os.makedirs(f'{dataset_root}analysis', exist_ok=True)
+    all_df = pd.DataFrame()
     for year_dir in os.listdir(data_root):
         for mic_dir in os.listdir(os.path.join(data_root, year_dir)):
-            df = pd.DataFrame()
             for loc_dir in os.listdir(os.path.join(data_root, year_dir, mic_dir)):
                 if loc_dir == 'summaries':
                     continue
                 full_path = os.path.join(data_root, year_dir, mic_dir, loc_dir)
-                df = pd.concat([df, wav_data(full_path, verbose=verbose)], ignore_index=True)
-                save_path = f'{dataset_root}analysis/{mic_dir}_data.csv'
-                df.to_csv(save_path, index=False)
-                logging.info(f'Analysis saved in {save_path}')
+                data = wav_data(full_path, verbose=verbose)
+                data['mic'] = mic_dir
+                data['location'] = loc_dir
+                all_df = pd.concat([all_df, data], ignore_index=True)
+
+    save_path = f'{dataset_root}analysis.csv'
+    all_df.to_csv(save_path, index=False)
+    logging.info(f'Analysis saved in {save_path}')
+    return save_path
 
 
 def get_dict(num_channels: int, sample_rate: int,
              frames: int, bit_depth: int,
              duration: float, wav_path: str,
-             exception: str = None):
+             file: str, exception: str = None):
     """
     Formats the audio metrics into a dictionary and returns it.
     """
@@ -49,7 +53,8 @@ def get_dict(num_channels: int, sample_rate: int,
         'Sample Rate': sample_rate,
         'Frames': frames,
         'Bit Depth': bit_depth,
-        'Duration': duration
+        'Duration': duration,
+        'File': file
     }
     if exception is not None:
         d['Exception'] = exception
@@ -80,11 +85,11 @@ def wav_data(directory_path: str, verbose: bool = False):
                 sample_rate = w.getframerate()
                 frames = w.getnframes()
                 bit_depth = w.getsampwidth() * 8  # convert bytes to bits
-                
+
                 duration = frames / float(sample_rate)
                 dicts.append(get_dict(num_channels, sample_rate,
                              frames, bit_depth,
-                             duration, path))
+                             duration, path, file))
         except Exception as e:
             # file is possibly corrupt
             num_channels = w.getnchannels()
@@ -93,6 +98,6 @@ def wav_data(directory_path: str, verbose: bool = False):
             bit_depth = w.getsampwidth() * 8
             dicts.append(get_dict(num_channels, sample_rate,
                          frames, bit_depth,
-                         duration, path,
+                         duration, path, file,
                          str(e)))
     return pd.DataFrame(dicts)
