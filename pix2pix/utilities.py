@@ -1,9 +1,6 @@
 """
 Utility functions
 
-- `get_files()`
-- `split_data()`
-- `set_device()`
 """
 import os
 import random
@@ -13,6 +10,26 @@ from PIL import Image
 import numpy as np
 import torch.nn.functional as F
 import torch.nn as nn
+
+
+def remove_padding(tensor, original_dimensions, pad_coords: dict, is_target):
+    batch_size, _, h, w = tensor.shape
+    for i in range(batch_size):
+        orig_h, orig_w = original_dimensions[i]
+        pad_coords = pad_coords[i]
+        if is_target:
+            print('TARGET')
+            cropped_tensor = tensor[i:i+1, :, pad_coords['top']:pad_coords['top'] + orig_h, :w - pad_coords['right']]
+        else:
+            print('INPUT')
+            cropped_tensor = tensor[i:i+1, :, pad_coords['top']:pad_coords['top'] + orig_h, pad_coords['left']:pad_coords['left'] + orig_w]
+            
+        print('tensor.shape', tensor.shape)
+        print('original_dimensions', original_dimensions[i])
+        print('pad_coords', pad_coords)
+        print('cropped_tensor.shape', cropped_tensor.shape)
+        
+        return cropped_tensor
 
 
 def test_custom_l1_loss():
@@ -42,18 +59,18 @@ def test_custom_l1_loss():
     non_padding_elements = torch.tensor([0.5, 0.3, 0.7, 0.2, 0.6])
     target_elements = torch.tensor([0.6, 0.4, 0.8, 0.3, 0.5])
     expected_loss = F.l1_loss(non_padding_elements, target_elements, reduction='mean')
-    
+
     print('loss', loss)
     print('expected loss', expected_loss)
     assert torch.isclose(loss, expected_loss, rtol=1e-4)
 
-# def custom_collate(batch):
-#     # stops conversion of original_dimensions to tensors
-#     input_tensors, target_tensors = zip(*batch)
-#     return torch.stack(input_tensors), torch.stack(target_tensors)
+
+def custom_collate(batch):
+    input_tensors, target_tensors, original_dimensions, padding_coords = zip(*batch)
+    return torch.stack(input_tensors), torch.stack(target_tensors), original_dimensions, padding_coords
 
 
-def save_tensor(tensor, save_path):
+def tensor_to_img(tensor):
     t = tensor.cpu().detach().numpy()
     try:
         batch_size, channels, height, width = t.shape
@@ -65,13 +82,12 @@ def save_tensor(tensor, save_path):
 
     # Normalize to 0-255 range and convert to uint8
     img = ((img - img.min()) / (img.max() - img.min()) * 255).astype(np.uint8)
-
     image = Image.fromarray(img, mode='L')
-    image.save(f'{save_path}')
+    return image
 
 
-def save_img_arr(img_arr, save_path):
-    image = Image.fromarray(img_arr)
+def save_tensor(tensor, save_path):
+    image = tensor_to_img(tensor)
     image.save(f'{save_path}')
 
 

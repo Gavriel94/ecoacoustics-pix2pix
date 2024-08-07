@@ -3,56 +3,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from tqdm import tqdm
 import os
-import numpy as np
 
 from . import config as cfg
-from . import utilities
-
-
-def remove_tensor_padding(image_tensor, original_size):
-    _, padded_height, padded_width = image_tensor.shape
-    original_height, original_width = original_size
-
-    start_h = min(0, (padded_height - original_height) // 2)
-    start_w = min(0, (padded_width - original_width) // 2)
-
-    filtered = image_tensor[:, start_h:start_h+original_height, start_w:start_w+original_width]
-
-    print(f'start_h = ({padded_height} - {original_height}) // 2', f'{(padded_height - original_height) // 2}')
-    print(f'start_w = ({padded_width} - {original_width}) // 2', f'{(padded_width - original_width) // 2}')
-
-    """
-    start_h = (4096 - 2584) // 2 756
-    start_w = (2048 - 2049) // 2 -1
-    """
-
-    print('REMOVING TENSOR PADDING')
-    print('padded_height', padded_height)
-    print('padded_width', padded_width)
-    print('original_height', original_height)
-    print('original_width', original_width)
-
-    print('image_tensor.shape', image_tensor.shape)
-    print('original_size', original_size)
-    print('start_h', start_h)
-    print('start_w', start_w)
-    print('filtered', filtered)
-
-    return filtered
-
-
-def crop_padding(img_arr, original_dimensions):
-    if img_arr.ndim == 3 and img_arr.shape[0] == 1:
-        img_arr = img_arr.squeeze(0)
-    original_height, original_width = original_dimensions
-    mask = img_arr != 1.0
-    rows, cols = np.any(mask, axis=1), np.any(mask, axis=0)
-    ymin, ymax = np.where(rows)[0][[0, -1]]
-    xmin, xmax = np.where(cols)[0][[0, -1]]
-    ymax = min(ymax + 1, original_height)
-    xmax = min(xmax + 1, original_width)
-    cropped = img_arr[ymin:ymax+1, xmin:xmax+1]
-    return cropped
+from . import utilities as ut
 
 
 def custom_l1_loss(input, target, padding_value=1.0):
@@ -66,40 +19,42 @@ def custom_l1_loss(input, target, padding_value=1.0):
 
 
 def train_model(discriminator, generator, data_loader, optim_discriminator, optim_generator, l1_loss, bce_logits):
+    os.makedirs('pix2pix/evaluation', exist_ok=True)
     run_name = f"pix2pix/evaluation/run-{len(os.listdir('pix2pix/evaluation'))}"
     disc_loss, gen_loss, l1_loss = [], [], []
     for epoch in range(cfg.NUM_EPOCHS):
         discriminator.train()
         generator.train()
         train_loader_tqdm = tqdm(data_loader, leave=True)
-        for idx, (input_img, target_img) in enumerate(train_loader_tqdm):
+        for idx, (input_img, target_img, original_size, padding_coords) in enumerate(train_loader_tqdm):
             save_path = f'{run_name}/epoch-{epoch}/batch_idx-{idx}/'
             os.makedirs(save_path, exist_ok=True)
-            utilities.save_tensor(input_img, os.path.join(save_path, 'input.png'))
-            utilities.save_tensor(target_img, os.path.join(save_path, 'target.png'))
+            ut.save_tensor(ut.remove_padding(input_img, original_size, padding_coords, is_target=False), os.path.join(save_path, 'input.png'))
+            ut.save_tensor(ut.remove_padding(target_img, original_size, padding_coords, is_target=True), os.path.join(save_path, 'target.png'))
 
             input_img, target_img = input_img.to(cfg.DEVICE), target_img.to(cfg.DEVICE)
-            print(input_img)
 
             # train discriminator
-            generated_image = generator(input_img)
-            utilities.save_tensor(generated_image, os.path.join(save_path, 'generated.png'))
-            D_real = discriminator(input_img, target_img)
-            D_fake = discriminator(input_img, generated_image.detach())
+            generated_image = generator(input_img)  # synthesise image
+            ut.save_tensor(ut.remove_padding(generated_image, original_size, padding_coords, is_target=False), os.path.join(save_path, 'generated.png'))
+            D_real = discriminator(input_img, target_img)  # dis output for real pair (input, target)
+            D_fake = discriminator(input_img, generated_image.detach())  # dis output for synth pair (input, generated)
+            # calculate losses
             D_real_loss = bce_logits(D_real, torch.ones_like(D_real))
             D_fake_loss = bce_logits(D_fake, torch.zeros_like(D_fake))
+            # calculate average of losses
             D_loss = (D_real_loss + D_fake_loss) / 2
-
+            # backpropagate and update disciminator weights
             optim_discriminator.zero_grad()
             D_loss.backward()
             optim_discriminator.step()
 
             # train generator
-            D_fake = discriminator(input_img, generated_image)
-            G_fake_loss = bce_logits(D_fake, torch.ones_like(D_fake))
-            L1 = custom_l1_loss(generated_image, target_img) * cfg.L1_LAMBDA
-            G_loss = G_fake_loss + L1
-
+            D_fake = discriminator(input_img, generated_image)  # disc output for synth pair (input, generated)
+            G_fake_loss = bce_logits(D_fake, torch.ones_like(D_fake))  # BCE for synth images (gen tries to fool dis, should be close to 1)
+            L1 = custom_l1_loss(generated_image, target_img) * cfg.L1_LAMBDA  # L1 loss between synth and target images encourage visual similarity
+            G_loss = G_fake_loss + L1  # generator loss is a combination of adverserial (G_fake_loss) and L1 loss
+            # backpropagate and update generator weights
             optim_generator.zero_grad()
             G_loss.backward()
             optim_generator.step()

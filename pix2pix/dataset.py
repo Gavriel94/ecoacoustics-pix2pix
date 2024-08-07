@@ -29,20 +29,20 @@ class SpectrogramDataset(Dataset):
             self.canvas_size = canvas_size
         else:
             raise NotTwoPower('canvas_size must be in the series 2^n ')
-        
+
     def calculate_bbox(self, image_arr):
         # Find coordinates where pixel value is 255 (white)
         white_pixels = np.where(image_arr == 255)
         if white_pixels[0].size == 0:  # No white area found
             return None
-        
+
         top = np.min(white_pixels[0])
         bottom = np.max(white_pixels[0])
         left = np.min(white_pixels[1])
         right = np.max(white_pixels[1])
-        
+
         return top, bottom, left, right
-    
+
     def crop_canvas(self, image):
         bbox = self.calculate_bbox(image)
         if bbox:
