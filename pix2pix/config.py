@@ -6,7 +6,7 @@ import pix2pix.utilities as utils
 import os
 # import logging
 
-DATA_ROOT = 'raw_data/'
+DATA_ROOT = 'raw_data_test/'
 DATASET_ROOT = 'data/'
 DATASET_PATH = os.path.join(DATASET_ROOT, 'dataset')
 
