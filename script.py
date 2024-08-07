@@ -42,23 +42,21 @@ def main():
     train, val, test = utils.split_data(files, 0.8)
 
     train_dataset = Pix2PixDataset(train, augment=False)
-    val_dataset = Pix2PixDataset(val, augment=False, canvas_size=4096)
-    test_dataset = Pix2PixDataset(test, augment=False, canvas_size=4096)
+    val_dataset = Pix2PixDataset(val, augment=False)
+    test_dataset = Pix2PixDataset(test, augment=False)
+    
     train_loader = DataLoader(train_dataset,
                               batch_size=cfg.BATCH_SIZE,
                               num_workers=cfg.NUM_WORKERS,
-                              shuffle=True,
-                              collate_fn=utils.custom_collate)
+                              shuffle=True)
     val_loader = DataLoader(val_dataset,
                             batch_size=cfg.BATCH_SIZE,
                             num_workers=cfg.NUM_WORKERS,
-                            shuffle=False,
-                            collate_fn=utils.custom_collate)
+                            shuffle=False)
     test_loader = DataLoader(test_dataset,
                              batch_size=cfg.BATCH_SIZE,
                              num_workers=cfg.NUM_WORKERS,
-                             shuffle=False,
-                             collate_fn=utils.custom_collate)
+                             shuffle=False)
 
     disc = Discriminator(in_ch=1).to(cfg.DEVICE)
     gen = Generator(in_ch=1, features=64).to(cfg.DEVICE)
