@@ -72,7 +72,7 @@ class Pix2PixDataset(Dataset):
         input_tensor = self.to_tensor(padded_input)
         target_tensor = self.to_tensor(padded_target)
 
-        return input_tensor, target_tensor, image.size
+        return input_tensor, target_tensor
 
 
 class NotTwoPower(Exception):

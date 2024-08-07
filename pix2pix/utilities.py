@@ -13,33 +13,27 @@ from PIL import Image
 import numpy as np
 
 
-def custom_collate(batch):
-    # stops conversion of original_dimensions to tensors
-    input_tensors, target_tensors, original_dimensions = zip(*batch)
-    return torch.stack(input_tensors), torch.stack(target_tensors), original_dimensions
+# def custom_collate(batch):
+#     # stops conversion of original_dimensions to tensors
+#     input_tensors, target_tensors = zip(*batch)
+#     return torch.stack(input_tensors), torch.stack(target_tensors)
 
 
-def save_img_tensor_in_tmp(img_tensor, img_type):
-    img_arr = img_tensor.cpu().detach().numpy()
-    print('img_arr.shape', img_arr.shape)
+def save_tensor(tensor, save_path):
+    t = tensor.cpu().detach().numpy()
     try:
-        batch_size, channels, height, width = img_arr.shape
+        batch_size, channels, height, width = t.shape
+        for i in range(batch_size):
+            img = np.squeeze(t[i])
     except Exception:
-        print(img_arr.shape)
-        pass
-    print('batch_size', batch_size)
-    print('channels', channels)
-    print('height', height)
-    print('width', width)
-
-    for i in range(batch_size):
-        img = np.squeeze(img_arr[i])
+        channels, height, width = t.shape
+        img = np.squeeze(t)
     
     # Normalize to 0-255 range and convert to uint8
     img = ((img - img.min()) / (img.max() - img.min()) * 255).astype(np.uint8)
     
     image = Image.fromarray(img, mode='L')
-    image.save(f'tmp/input_output/{img_type}_batch_{i}.png')
+    image.save(f'{save_path}')
 
 
 def save_img_arr_in_tmp(img_arr, img_path, mic_name):
