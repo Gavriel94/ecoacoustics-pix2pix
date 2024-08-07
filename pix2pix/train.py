@@ -1,13 +1,9 @@
-from ctypes import util
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from tqdm import tqdm
 import os
-from PIL import Image
-import matplotlib.pyplot as plt
 import numpy as np
-from datetime import datetime
 
 from . import config as cfg
 from . import utilities
@@ -59,7 +55,7 @@ def crop_padding(img_arr, original_dimensions):
     return cropped
 
 
-def custom_l1_loss(input, target, padding_value=0):
+def custom_l1_loss(input, target, padding_value=1.0):
     if input.size() != target.size():
         target = F.interpolate(target, size=input.size()[2:], mode='bilinear', align_corners=False)
 
@@ -81,8 +77,9 @@ def train_model(discriminator, generator, data_loader, optim_discriminator, opti
             os.makedirs(save_path, exist_ok=True)
             utilities.save_tensor(input_img, os.path.join(save_path, 'input.png'))
             utilities.save_tensor(target_img, os.path.join(save_path, 'target.png'))
-            
+
             input_img, target_img = input_img.to(cfg.DEVICE), target_img.to(cfg.DEVICE)
+            print(input_img)
 
             # train discriminator
             generated_image = generator(input_img)
