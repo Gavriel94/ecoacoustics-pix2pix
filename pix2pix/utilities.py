@@ -4,12 +4,44 @@ Utility functions
 """
 import os
 import random
+import librosa
 import torch
 import matplotlib.pyplot as plt
 from PIL import Image
 import numpy as np
 import torch.nn.functional as F
 import torch.nn as nn
+import json
+import soundfile as sf
+
+
+def spectrogram_to_audio(spectrogram_path, params_path, output_path):
+    spectrogram_img = Image.open(spectrogram_path)
+    spectrogram_arr = np.array(spectrogram_img)
+    
+    with open(params_path, 'r') as f:
+        params = json.load(f)
+        print(params.keys())
+        
+        magnitude_real = np.array(params['magnitude_real'])
+        magnitude_imag = np.array(params['magnitude_imag'])
+        phase_real = np.array(params['phase_real'])
+        phase_imag = np.array(params['phase_imag'])
+        
+        magnitude = magnitude_real + 1j * magnitude_imag
+        phase = phase_real + 1j * phase_imag
+        
+        s_db = (spectrogram_arr / 255) * (np.max(magnitude) - np.min(magnitude)) + np.min(magnitude)
+        s = librosa.db_to_amplitude(s_db, ref=np.max(magnitude))
+        
+        stft_matrix = s * phase
+        
+        y = librosa.istft(stft_matrix,
+                          hop_length=params['hop_length'],
+                          win_length=params['n_fft'],
+                          length=params.get('original_length'))
+        
+        sf.write(output_path, y, 48000)
 
 
 def remove_padding(tensor, original_dimensions, pad_coords: dict, is_target):
