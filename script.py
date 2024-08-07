@@ -15,15 +15,19 @@ from pix2pix.ds import Pix2PixDataset
 
 def main():
     # utils.spectrogram_to_audio('data/spectrograms/2023_11/PLI3/PLI3_20231129_142200.png', 'data/spectrograms/2023_11/PLI3/params/PLI3_20231129_142200.json', 'tmp/e.wav')
-    create_new_dataset = False
+    create_new_dataset = True
 
-    if create_new_dataset or not os.path.isdir(cfg.DATASET_PATH) or len(os.listdir(cfg.DATASET_PATH)) == 0:
-        print(cfg.DATASET_PATH)
+    if create_new_dataset:
+        os.makedirs(cfg.DATASET_PATH, exist_ok=True)
         print('Creating a new dataset in \'data/\'\n')
         create_dataset(data_root=cfg.DATA_ROOT,
                        dataset_root=cfg.DATASET_ROOT,
                        verbose=True)
+
+    files = utils.get_files(cfg.DATASET_PATH, include_correlated=False)[:10]
     
+    
+        
     # # get files from dataset
     # files = utils.get_files(cfg.DATASET_PATH, include_correlated=False)
 
