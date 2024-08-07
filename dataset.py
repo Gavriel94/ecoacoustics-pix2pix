@@ -14,6 +14,7 @@ import logging
 
 # setup_logging()
 
+# not in use yet
 logging.basicConfig(format='%(asctime)s:%(message)s',
                     level=logging.INFO,
                     datefmt='%m/%d/%Y %I:%M:%S %p')
@@ -109,7 +110,7 @@ def validate_summary_folder(year_mic_path: str):
     if 'summaries' not in os.listdir(year_mic_path):
         for loc in os.listdir(year_mic_path):
             dest = os.path.join(year_mic_path, loc)
-            logging.info(f'Creating summary for {dest}')
+            print(f'Creating summary for {dest}')
             create_summary_file(dest)
     return os.path.join(year_mic_path, 'summaries')
 
@@ -163,7 +164,7 @@ def create_summary_file(dir_path: str):
     # emulate .txt file name format from other summaries
     file_name = location + '_Summary_' + first_date + '_' + last_date + '.txt'
     file_path = (folder_path + '/' + file_name)
-    logging.info(f'Summary file generated\nSaved in {file_path}\n')
+    print(f'Summary file generated\nSaved in {file_path}\n')
     df.to_csv(file_path, index=False)
 
 
@@ -240,8 +241,6 @@ def match_summaries(summary_dir: list, data_to: str, verbose: bool = False):
         save_path = dir_path + '/summary.csv'
         matches.to_csv(save_path)
         summaries.append(save_path)
-        if verbose:
-            logging.info(f'Saved matches from {pair} to {save_path}')
     return summaries
 
 
@@ -312,7 +311,7 @@ def get_recordings(data_dict: dict,
                             recording = os.path.join(folder, file)
                             save_path = f'{dataset_root}{year}/{location}'
                             if verbose:
-                                logging.info(f'Copying {recording} to {save_path}')
+                                print(f'Copying {recording} to {save_path}')
                             shutil.copy(recording, save_path)
                             save_paths.add(save_path)
                         except FileNotFoundError as e:
@@ -324,8 +323,8 @@ def create_spectrograms(directories: list,
                         n_fft: int,
                         root: str,
                         target_width: int,
+                        analysis_path,
                         hop_length: int = None,
-                        labels: bool = None,
                         verbose: bool = False):
     """
     Create spectrograms for all .wav files in a folder.
@@ -340,18 +339,20 @@ def create_spectrograms(directories: list,
     if hop_length is None:
         hop_length = n_fft // 4
     save_paths = set()
+    analysis_df = pd.read_csv(analysis_path)
     for directory in directories:
         files = os.listdir(directory)
         for i, file in enumerate(files):
             if file.split('.')[-1] == 'csv':
                 continue
             if verbose:
-                logging.info(f'Generating spectrogram for {file}, '
+                print(f'Generating spectrogram for {file}, '
                              f'{i + 1}/{len(files)} files')
             path = os.path.join(directory, file)
             try:
                 y, sr = librosa.load(path)
                 s = librosa.stft(y, n_fft=n_fft, hop_length=hop_length)
+                magnitude, phase = librosa.magphase(s)
                 s_db = librosa.amplitude_to_db(np.abs(s), ref=np.max)
 
                 # normalise spectrogram to range (0, 255)
@@ -362,17 +363,40 @@ def create_spectrograms(directories: list,
                 save_path = directory.replace(f'{root}',
                                               f'{root}spectrograms/')
                 os.makedirs(save_path, exist_ok=True)
+                os.makedirs(f'{save_path}/params/', exist_ok=True)
                 # save image
                 image = Image.fromarray(s_db_norm)
 
                 if target_width is not None:
                     aspect_ratio = image.width / image.height
                     target_height = int(target_width / aspect_ratio)
-                    image_resized = image.resize((target_width, target_height), Image.LANCZOS)
-                    image_resized.save(f"{save_path}/{file.replace('.wav', '.png')}")
-                else:
-                    image.save(f"{save_path}/{file.replace('.wav', '.png')}")
-                    save_paths.add(save_path)
+                    image = image.resize((target_width, target_height), Image.LANCZOS)
+
+                file_path = f"{save_path}/{file.replace('.wav', '.png')}"
+                image.save(file_path)
+                save_paths.add(save_path)
+                
+                params = {
+                    'magnitude_real': magnitude.real.tolist(),
+                    'magnitude_imag': magnitude.imag.tolist(),
+                    'phase_real': phase.real.tolist(),
+                    'phase_imag': phase.imag.tolist(),
+                    'n_fft': n_fft,
+                    'hop_length': hop_length,
+                    'file': file
+                }
+                # print(params)
+                params_df = pd.DataFrame(params)
+                df_merged = pd.merge(analysis_df, params_df, on='file')
+ 
+                print('file_path', file_path)
+                print('len params_df', len(params_df))
+                print('len df_merged', len(df_merged))
+                print('analysis path variable', analysis_path)
+                
+                df_merged.to_csv(analysis_path, index=False)
+                # with open(f'{save_path}/params/{file_name}.json', 'w') as f:
+                #     f.write(json.dumps(params))
             except Exception as e:
                 logging.error(str(e))
     return list(save_paths)
@@ -400,6 +424,9 @@ def pair_spectrograms(directories: list):
     for directory in directories:
         files = os.listdir(directory)
         for filename in files:
+            print('filename', filename)
+            if filename == 'params':
+                continue
             loc, datetime = extract_datetime(filename)
             if '-4' in filename:
                 loc = loc.replace('-4', '')
@@ -502,12 +529,11 @@ def stitch_images(paired_spectrogram_paths: list[tuple], dataset_root: str):
         except Exception as e:
             logging.error(str(e))
         correlated = False
-        logging.info(f'Stitched {i + 1}/{len(paired_spectrogram_paths)} images')
+        print(f'Stitched {i + 1}/{len(paired_spectrogram_paths)} images')
 
 
 def create_dataset(data_root: str,
                    dataset_root: str,
-                   analysis: bool,
                    target_width: int | None = None,
                    matched_summaries: list | None = None,
                    copied_recordings: list | None = None,
@@ -520,10 +546,9 @@ def create_dataset(data_root: str,
     # create a directory to store the dataset in
     os.makedirs(dataset_root, exist_ok=True)
 
-    if analysis:
-        logging.debug('Analysing recordings')
-        # list metrics for each recording and save them in the dataset folder
-        analyse_recordings(data_root, dataset_root, verbose)
+    print('Analysing recordings\n')
+    # list metrics for each recording and save them in the dataset folder
+    analysis_path = analyse_recordings(data_root, dataset_root, verbose)
 
     # organise data by year and microphone
     data_dict = create_data_dict(data_root, dataset_root)
@@ -542,14 +567,14 @@ def create_dataset(data_root: str,
         if summary_paths is None:
             raise UnboundLocalError('Summary paths were not generated.')
         # generate CSV files listing matched recordings from data in summary files
-        logging.debug('Matching summaries')
+        print('Matching summaries\n')
         matched_summaries = [match_summaries(summary_paths[year], dataset_root, verbose)
                              for year in summary_paths.keys()]
 
     if copied_recordings is None:
         if not matched_summaries:
             raise UnboundLocalError('No matched summaries')
-        logging.debug('Copying recordings')
+        print('Copying recordings\n')
         # copy matching recordings from raw data to dataset folders
         copied_recordings = [get_recordings(data_dict, data_root,
                                             dataset_root, summary_file)
@@ -558,9 +583,10 @@ def create_dataset(data_root: str,
     if spectrogram_paths is None:
         if not copied_recordings:
             raise UnboundLocalError('No paths to recordings')
-        logging.debug('Creating spectrograms')
+        print('Creating spectrograms\n')
         spectrogram_paths = [create_spectrograms(audio, n_fft=4096,
                                                  root=dataset_root,
+                                                 analysis_path=analysis_path,
                                                  target_width=target_width,
                                                  verbose=verbose)
                              for audio in copied_recordings]
@@ -571,6 +597,6 @@ def create_dataset(data_root: str,
     # find matching pairs by pathname
     paired_spectrograms = pair_spectrograms(spectrogram_paths)
 
-    logging.debug('Stiching images')
+    print('Stiching images')
     # stich images together to create the dataset
     stitch_images(paired_spectrograms, dataset_root)
