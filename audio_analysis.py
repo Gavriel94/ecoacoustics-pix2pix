@@ -37,7 +37,6 @@ def analyse_recordings(data_root: str, dataset_root: str, verbose: bool = False)
     save_path = f'{dataset_root}analysis.csv'
     all_df.to_csv(save_path, index=False)
     logging.info(f'Analysis saved in {save_path}')
-    return save_path
 
 
 def get_dict(num_channels: int, sample_rate: int,

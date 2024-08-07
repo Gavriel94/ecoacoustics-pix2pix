@@ -316,6 +316,7 @@ def get_recordings(data_dict: dict,
                             save_paths.add(save_path)
                         except FileNotFoundError as e:
                             logging.error(str(e))
+        print('\n')
     return list(save_paths)
 
 
@@ -323,7 +324,6 @@ def create_spectrograms(directories: list,
                         n_fft: int,
                         root: str,
                         target_width: int,
-                        analysis_path,
                         hop_length: int = None,
                         verbose: bool = False):
     """
@@ -336,10 +336,9 @@ def create_spectrograms(directories: list,
             Default is n_fft // 4.
         verbose (bool, optional): Display progress. Defaults to False.
     """
-    if hop_length is None:
-        hop_length = n_fft // 4
+    # if hop_length is None:
+    hop_length = n_fft // 4
     save_paths = set()
-    analysis_df = pd.read_csv(analysis_path)
     for directory in directories:
         files = os.listdir(directory)
         for i, file in enumerate(files):
@@ -360,10 +359,8 @@ def create_spectrograms(directories: list,
                 s_db_norm = s_db_norm.astype(np.uint8)
 
                 # create path and directory
-                save_path = directory.replace(f'{root}',
-                                              f'{root}spectrograms/')
+                save_path = os.path.join(root, 'spectrograms')
                 os.makedirs(save_path, exist_ok=True)
-                os.makedirs(f'{save_path}/params/', exist_ok=True)
                 # save image
                 image = Image.fromarray(s_db_norm)
 
@@ -383,18 +380,13 @@ def create_spectrograms(directories: list,
                     'phase_imag': phase.imag.tolist(),
                     'n_fft': n_fft,
                     'hop_length': hop_length,
-                    'file': file
                 }
-                # print(params)
-                params_df = pd.DataFrame(params)
-                df_merged = pd.merge(analysis_df, params_df, on='file')
- 
-                print('file_path', file_path)
-                print('len params_df', len(params_df))
-                print('len df_merged', len(df_merged))
-                print('analysis path variable', analysis_path)
+                json_path = os.path.join(save_path, 'json')
+                os.makedirs(json_path, exist_ok=True)
+                json_save = os.path.join(json_path, f"{file.replace('.wav', '.json')}")
+                with open(json_save, 'w') as f:
+                    json.dump(params, f)
                 
-                df_merged.to_csv(analysis_path, index=False)
                 # with open(f'{save_path}/params/{file_name}.json', 'w') as f:
                 #     f.write(json.dumps(params))
             except Exception as e:
@@ -424,8 +416,7 @@ def pair_spectrograms(directories: list):
     for directory in directories:
         files = os.listdir(directory)
         for filename in files:
-            print('filename', filename)
-            if filename == 'params':
+            if filename == 'json':
                 continue
             loc, datetime = extract_datetime(filename)
             if '-4' in filename:
@@ -548,7 +539,7 @@ def create_dataset(data_root: str,
 
     print('Analysing recordings\n')
     # list metrics for each recording and save them in the dataset folder
-    analysis_path = analyse_recordings(data_root, dataset_root, verbose)
+    analyse_recordings(data_root, dataset_root, verbose)
 
     # organise data by year and microphone
     data_dict = create_data_dict(data_root, dataset_root)
@@ -586,7 +577,6 @@ def create_dataset(data_root: str,
         print('Creating spectrograms\n')
         spectrogram_paths = [create_spectrograms(audio, n_fft=4096,
                                                  root=dataset_root,
-                                                 analysis_path=analysis_path,
                                                  target_width=target_width,
                                                  verbose=verbose)
                              for audio in copied_recordings]
