@@ -18,7 +18,7 @@ def custom_l1_loss(input, target, padding_value=1.0):
     return masked_loss.sum() / mask.sum()
 
 
-def train_model(discriminator, generator, data_loader, optim_discriminator, optim_generator, l1_loss, bce_logits):
+def train_model(discriminator, generator, data_loader, optim_discriminator, optim_generator, l1_loss, bce_logits, view_images: int | None = None):
     os.makedirs('pix2pix/evaluation', exist_ok=True)
     run_name = f"pix2pix/evaluation/run-{len(os.listdir('pix2pix/evaluation'))}"
     disc_loss, gen_loss, l1_loss = [], [], []
@@ -29,14 +29,11 @@ def train_model(discriminator, generator, data_loader, optim_discriminator, opti
         for idx, (input_img, target_img, original_size, padding_coords) in enumerate(train_loader_tqdm):
             save_path = f'{run_name}/epoch-{epoch}/batch_idx-{idx}/'
             os.makedirs(save_path, exist_ok=True)
-            ut.save_tensor(ut.remove_padding(input_img, original_size, padding_coords, is_target=False), os.path.join(save_path, 'input.png'))
-            ut.save_tensor(ut.remove_padding(target_img, original_size, padding_coords, is_target=True), os.path.join(save_path, 'target.png'))
 
             input_img, target_img = input_img.to(cfg.DEVICE), target_img.to(cfg.DEVICE)
 
             # train discriminator
             generated_image = generator(input_img)  # synthesise image
-            ut.save_tensor(ut.remove_padding(generated_image, original_size, padding_coords, is_target=False), os.path.join(save_path, 'generated.png'))
             D_real = discriminator(input_img, target_img)  # dis output for real pair (input, target)
             D_fake = discriminator(input_img, generated_image.detach())  # dis output for synth pair (input, generated)
             # calculate losses
@@ -67,5 +64,21 @@ def train_model(discriminator, generator, data_loader, optim_discriminator, opti
             disc_loss.append(D_loss.item())
             gen_loss.append(G_loss.item())
             l1_loss.append(L1.item())
+
+            ut.save_tensor(
+                ut.remove_padding(input_img, original_size,
+                                  padding_coords, is_target=False),
+                os.path.join(save_path, 'input.png')
+            )
+            ut.save_tensor(
+                ut.remove_padding(target_img, original_size,
+                                  padding_coords, is_target=True),
+                os.path.join(save_path, 'target.png')
+            )
+            ut.save_tensor(
+                ut.remove_padding(generated_image, original_size,
+                                  padding_coords, is_target=False),
+                os.path.join(save_path, 'generated.png')
+            )
 
     return disc_loss, gen_loss, l1_loss
