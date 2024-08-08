@@ -8,7 +8,7 @@ def main():
 
     output_path = os.path.join('data', 'spectrograms', 'spectrogram_to_audio')
     os.makedirs(output_path, exist_ok=True)
-    
+
     overwrite = True
     if not overwrite:
         if os.path.exists(os.path.join(output_path, filename)):

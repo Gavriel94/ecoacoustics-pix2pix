@@ -18,15 +18,15 @@ def custom_l1_loss(input, target, padding_value=1.0):
 
 
 def train_model(discriminator, generator, data_loader, optim_discriminator, optim_generator, l1_loss, l1_lambda, bce_logits, num_epochs, device):
-    os.makedirs('pix2pix/evaluation', exist_ok=True)
-    run_name = f"pix2pix/evaluation/run-{len(os.listdir('pix2pix/evaluation'))}"
+    os.makedirs('data/evaluation', exist_ok=True)
+    run_name = f"data/evaluation/run-{len(os.listdir('data/evaluation'))}"
     disc_loss, gen_loss, l1_loss = [], [], []
     for epoch in range(num_epochs):
         discriminator.train()
         generator.train()
         train_loader_tqdm = tqdm(data_loader, leave=True)
         for idx, (input_img, target_img, original_size, padding_coords, img_names) in enumerate(train_loader_tqdm):
-            save_path = f'{run_name}/epoch-{epoch}/batch_idx-{idx}/'
+            save_path = f'{run_name}/epoch_{epoch}/batch_idx_{idx}/'
             os.makedirs(save_path, exist_ok=True)
 
             input_img, target_img = input_img.to(device), target_img.to(device)
