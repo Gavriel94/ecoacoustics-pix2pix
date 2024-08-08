@@ -50,16 +50,9 @@ def remove_padding(tensor, original_dimensions, pad_coords: dict, is_target):
         orig_h, orig_w = original_dimensions[i]
         pad_coords = pad_coords[i]
         if is_target:
-            print('TARGET')
             cropped_tensor = tensor[i:i+1, :, pad_coords['top']:pad_coords['top'] + orig_h, :w - pad_coords['right']]
         else:
-            print('INPUT')
             cropped_tensor = tensor[i:i+1, :, pad_coords['top']:pad_coords['top'] + orig_h, pad_coords['left']:pad_coords['left'] + orig_w]
-            
-        print('tensor.shape', tensor.shape)
-        print('original_dimensions', original_dimensions[i])
-        print('pad_coords', pad_coords)
-        print('cropped_tensor.shape', cropped_tensor.shape)
         
         return cropped_tensor
 
@@ -98,8 +91,8 @@ def test_custom_l1_loss():
 
 
 def custom_collate(batch):
-    input_tensors, target_tensors, original_dimensions, padding_coords = zip(*batch)
-    return torch.stack(input_tensors), torch.stack(target_tensors), original_dimensions, padding_coords
+    input_tensors, target_tensors, original_dimensions, padding_coords, image_path = zip(*batch)
+    return torch.stack(input_tensors), torch.stack(target_tensors), original_dimensions, padding_coords, image_path
 
 
 def tensor_to_img(tensor):
