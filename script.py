@@ -18,8 +18,8 @@ import pix2pix.utilities as utils
 #                         datefmt='%m/%d/%Y %I:%M:%S %p')
 #     logging.getLogger('PIL').setLevel(logging.WARNING)
 
-RAW_DATA = 'raw_data_test'
-DATASET = 'data'
+RAW_DATA = 'raw_data_test/'
+DATASET = 'data/'
 DATASET_PATH = os.path.join(DATASET, 'dataset')
 
 MATCHED_SUMMARIES = [['data/2024_03/PLI1/summary.csv',
@@ -50,58 +50,47 @@ L1_LAMBDA = 100
 
 
 def main():
-    create_new_dataset = True
-    train_model = True
+    create_new_dataset = False
 
     if create_new_dataset:
         print(f'Creating {DATASET_PATH}\n')
         create_dataset(data_root=RAW_DATA,
                        dataset_root=DATASET,
                        analysis=False,
-                    #    matched_summaries=MATCHED_SUMMARIES,
-                    #    copied_recordings=COPIED_RECORDINGS,
-                    #    spectrogram_paths=SPECTROGRAM_PATHS,
+                       matched_summaries=MATCHED_SUMMARIES,
+                       copied_recordings=COPIED_RECORDINGS,
+                       spectrogram_paths=SPECTROGRAM_PATHS,
                        verbose=True)
-    if train_model:
-        # get files from dataset
-        files = utils.get_files(DATASET_PATH, include_correlated=False)
-
-        # * used for debugging - alter the size of dataset
-        files = files[:10]
-
-        train, val, test = utils.split_data(files, 0.8)
-
-        train_dataset = Pix2PixDataset(train, augment=False)
         
-        train_loader = DataLoader(train_dataset,
-                                  batch_size=BATCH_SIZE,
-                                  num_workers=NUM_WORKERS,
-                                  shuffle=True,
-                                  collate_fn=utils.custom_collate)
+    # get files from dataset
+    files = utils.get_files(DATASET_PATH, include_correlated=False)
 
-        disc = Discriminator(in_ch=1).to(DEVICE)
-        gen = Generator(in_ch=1, features=64).to(DEVICE)
-        # setting betas reduce momentum (used in the paper)
-        optim_disc = optim.Adam(disc.parameters(), lr=LEARNING_RATE, betas=(0.5, 0.999))
-        optim_gen = optim.Adam(gen.parameters(), lr=LEARNING_RATE, betas=(0.5, 0.999))
-        BCE = nn.BCEWithLogitsLoss()
-        L1_LOSS = nn.L1Loss()
-        disc_loss, gen_loss, l1_loss = train_model(disc, gen, train_loader,
-                                                   optim_disc, optim_gen, L1_LOSS, L1_LAMBDA,
-                                                   BCE, NUM_EPOCHS, DEVICE)
-        utils.plot_loss(disc_loss, gen_loss, l1_loss)
-        
-    spectrogram_name = 'PLI1-4_202316_121100'
-    
-    # gets true recording
-    location, date, time = spectrogram_name.split('_')
-    location = location.replace('-4', '')
-    date = date[:4] + '_' + date[4:]
-    true_recording_path = os.path.join('data', date, location, spectrogram_name)
-    
-    # data/year/location/spectrogram_name
-    
-    # utils.spectrogram_to_audio(f'{DATASET_ROOT}/', f'{DATASET_ROOT}spectrograms/2024_03/PLI1/params/{spectrogram}.json', )
+    # create train, val, test sets
+    train, _, _ = utils.split_data(files, 0.8)
+
+    train_dataset = Pix2PixDataset(train, augment=False)
+
+    train_loader = DataLoader(train_dataset,
+                              batch_size=BATCH_SIZE,
+                              num_workers=NUM_WORKERS,
+                              shuffle=True,
+                              collate_fn=utils.custom_collate)
+
+    disc = Discriminator(in_ch=1).to(DEVICE)
+    gen = Generator(in_ch=1, features=64).to(DEVICE)
+    # setting betas reduce momentum (used in the paper)
+    optim_disc = optim.Adam(disc.parameters(), lr=LEARNING_RATE, betas=(0.5, 0.999))
+    optim_gen = optim.Adam(gen.parameters(), lr=LEARNING_RATE, betas=(0.5, 0.999))
+    BCE = nn.BCEWithLogitsLoss()
+    L1_LOSS = nn.L1Loss()
+    disc_loss, gen_loss, l1_loss = train_model(disc, gen, train_loader,
+                                               optim_disc, optim_gen, L1_LOSS, L1_LAMBDA,
+                                               BCE, NUM_EPOCHS, DEVICE)
+    utils.plot_loss(disc_loss, gen_loss, l1_loss)
+
+    spectrogram_path = 'data/spectrograms/PLI1_20240316_115600.png'
+    spectrogram_name = 'PLI1_20240316_115600'
+    utils.spectrogram_to_audio(spectrogram_path, f'spectrogram_to_audio/{spectrogram_name}.wav', sample_rate=48000)
 
 
 if __name__ == '__main__':
