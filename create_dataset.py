@@ -369,12 +369,11 @@ def create_spectrograms(recordings: list,
     if hop_length is None:
         hop_length = n_fft // 4
     spectrogram_paths = set()
-    for i, recording in enumerate(recordings):
-        if recording.split('.')[-1] != 'wav':
+    for i, wav_file in enumerate(recordings):
+        if wav_file.split('.')[-1] != 'wav':
             continue
-            
         try:
-            y, sr = librosa.load(recording)
+            y, sr = librosa.load(wav_file)
             s = librosa.stft(y, n_fft=n_fft, hop_length=hop_length)
             magnitude, phase = librosa.magphase(s)
             s_db = librosa.amplitude_to_db(np.abs(s), ref=np.max)
@@ -386,7 +385,7 @@ def create_spectrograms(recordings: list,
             # create path and directory
             recordings = os.path.join(dataset, 'spectrograms', set_type)
             if verbose:
-                print(f'Generating spectrogram for {recording}, {i+1}/{len(recordings)}')
+                print(f'Generating spectrogram for {wav_file}, {i+1}/{len(recordings)}')
             os.makedirs(recordings, exist_ok=True)
             # save image
             image = Image.fromarray(s_db_norm)
@@ -398,11 +397,11 @@ def create_spectrograms(recordings: list,
             
             # raw_data_test/2023_11/SM4/PLI2/PLI2-4_20231208_184900.wav
             # recordings = 'data/spectrograms'
-            image.save(f"{recordings}/{recording.split('/')[4].replace('.wav', '.png')}")
+            image.save(f"{recordings}/{wav_file.split('/')[4].replace('.wav', '.png')}")
             spectrogram_paths.add(recordings)
 
             # create params dict for test set to revert synth spectrograms back to audio
-            if set_type == 'test':
+            if set_type == 'test_set':
                 params = {
                     'magnitude_real': magnitude.real.tolist(),
                     'magnitude_imag': magnitude.imag.tolist(),
@@ -410,11 +409,11 @@ def create_spectrograms(recordings: list,
                     'phase_imag': phase.imag.tolist(),
                     'n_fft': n_fft,
                     'hop_length': hop_length,
-                    'file': recording
+                    'file': wav_file
                 }
                 params_path = os.path.join(recordings, 'params')
                 os.makedirs(params_path, exist_ok=True)
-                file_path_params = os.path.join(params_path, recording.split('/')[4].replace('.wav', '.json'))
+                file_path_params = os.path.join(params_path, wav_file.split('/')[4].replace('.wav', '.json'))
                 if verbose:
                     print(f'Saved {file_path_params}')
 
@@ -607,32 +606,43 @@ def main():
     print(f'Validation set: {len(val)} elements')
     print(f'Test set: {len(test)} elements')
     print()
+    
+    print('Training set')
+    print(train)
+    print('Validation set')
+    print(val)
 
+    # TODO pair spectrograms before creating them, then the stitched ones can be saved in the appropriate set
+    
     print('Creating spectrograms')
-    train_paths = create_spectrograms(train, n_fft=4096,
-                                      set_type='train', dataset=data, verbose=True)
+    training_set = create_spectrograms(train, n_fft=4096,
+                                       set_type='train_set', dataset=data, verbose=True)
     
-    val_paths = create_spectrograms(val, n_fft=4096,
-                                    set_type='val', dataset=data, verbose=True)
+    print('train paths')
+    print(training_set)
     
-    test_paths = create_spectrograms(test, n_fft=4096,
-                                     set_type='test', dataset=data, verbose=True)
+    validation_set = create_spectrograms(val, n_fft=4096,
+                                         set_type='val_set', dataset=data, verbose=True)
+    print('val_paths')
+    print(validation_set)
     
-
+    test_set = create_spectrograms(test, n_fft=4096,
+                                   set_type='test_set', dataset=data, verbose=True)
+    
+    print('Pairing spectrograms')
+    paired_train = pair_spectrograms(training_set)
+    print('Paired train')
+    paired_val = pair_spectrograms(validation_set)
+    print('Paired val')
+    paired_test = pair_spectrograms(test_set)
+    print('Paired test')
+    print()
+    
     # # merge all available spectrograms into one list
     # spectrogram_paths = [path for sublist in spectrogram_paths for path in sublist]
     
-    print('Pairing spectrograms')
-    paired_train = pair_spectrograms(train_paths)
-    print('Paired train')
-    paired_val = pair_spectrograms(val_paths)
-    print('Paired val')
-    paired_test = pair_spectrograms(test_paths)
-    print('Paired test')
-    print()
-
-    print('Stiching images')
-    # stich images together to create the dataset
+    print('Stitching images')
+    # stitch images together to create the dataset
     stitch_images(paired_train, data)
     stitch_images(paired_val, data)
     stitch_images(paired_test, data)
