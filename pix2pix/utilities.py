@@ -46,8 +46,6 @@ def spectrogram_to_audio(spectrogram_path: str, output_path: str, sample_rate):
                           win_length=params['n_fft'],
                           length=params.get('original_length'))
 
-        output_path = os.path.join(root, specs, 'spectrogram_to_audio')
-        os.makedirs(output_path, exist_ok=True)
         file_path = os.path.join(output_path, spectrogram_path.split('/')[2].replace('.png', '.wav'))
         # save audio
         sf.write(file_path, y, sample_rate)
