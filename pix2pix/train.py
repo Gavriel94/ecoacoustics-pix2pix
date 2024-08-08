@@ -63,21 +63,22 @@ def train_model(discriminator, generator, data_loader, optim_discriminator, opti
             disc_loss.append(D_loss.item())
             gen_loss.append(G_loss.item())
             l1_loss.append(L1.item())
-
-            ut.save_tensor(
-                ut.remove_padding(input_img, original_size,
-                                  padding_coords, is_target=False),
-                os.path.join(save_path, f"{img_names[idx].replace('.png', '_input.png')}")
-            )
-            ut.save_tensor(
-                ut.remove_padding(target_img, original_size,
-                                  padding_coords, is_target=True),
-                os.path.join(save_path, f"{img_names[idx].replace('.png', '_target.png')}")
-            )
-            ut.save_tensor(
-                ut.remove_padding(generated_image, original_size,
-                                  padding_coords, is_target=False),
-                os.path.join(save_path, f"{img_names[idx].replace('.png', '_generated.png')}")
-            )
+            
+            if idx % 5 == 0:
+                ut.save_tensor(
+                    ut.remove_padding(input_img, original_size,
+                                      padding_coords, is_target=False),
+                    os.path.join(save_path, f"{img_names[idx].replace('.png', '_input.png')}")
+                )
+                ut.save_tensor(
+                    ut.remove_padding(target_img, original_size,
+                                      padding_coords, is_target=True),
+                    os.path.join(save_path, f"{img_names[idx].replace('.png', '_target.png')}")
+                )
+                ut.save_tensor(
+                    ut.remove_padding(generated_image, original_size,
+                                      padding_coords, is_target=False),
+                    os.path.join(save_path, f"{img_names[idx].replace('.png', '_generated.png')}")
+                )
 
     return disc_loss, gen_loss, l1_loss

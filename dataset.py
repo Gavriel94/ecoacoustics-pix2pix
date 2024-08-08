@@ -527,7 +527,6 @@ def stitch_images(paired_spectrogram_paths: list[tuple], dataset_root: str):
 
 def create_dataset(data_root: str,
                    dataset_root: str,
-                   analysis: bool,
                    target_width: int | None = None,
                    matched_summaries: list | None = None,
                    copied_recordings: list | None = None,
@@ -540,10 +539,9 @@ def create_dataset(data_root: str,
     # create a directory to store the dataset in
     os.makedirs(dataset_root, exist_ok=True)
 
-    if analysis:
-        logging.debug('Analysing recordings')
-        # list metrics for each recording and save them in the dataset folder
-        analyse_recordings(data_root, dataset_root, verbose)
+    logging.debug('Analysing recordings')
+    # list metrics for each recording and save them in the dataset folder
+    analyse_recordings(data_root, dataset_root, verbose)
 
     # organise data by year and microphone
     data_dict = create_data_dict(data_root, dataset_root)

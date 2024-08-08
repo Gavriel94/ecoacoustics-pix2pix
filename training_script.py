@@ -18,27 +18,31 @@ import pix2pix.utilities as utils
 #                         datefmt='%m/%d/%Y %I:%M:%S %p')
 #     logging.getLogger('PIL').setLevel(logging.WARNING)
 
-RAW_DATA = 'raw_data_test/'
+RAW_DATA = 'raw_data/'
 DATASET = 'data/'
 DATASET_PATH = os.path.join(DATASET, 'dataset')
 
-MATCHED_SUMMARIES = [['data/2024_03/PLI1/summary.csv',
-                      'data/2024_03/PLI2/summary.csv',
-                      'data/2024_03/PLI3/summary.csv'],
-                     ['data/2023_11/PLI2/summary.csv',
-                      'data/2023_11/PLI3/summary.csv']]
+MATCHED_SUMMARIES = None
+COPIED_RECORDINGS = None
+SPECTROGRAM_PATHS = None
 
-COPIED_RECORDINGS = [['data/2024_03/PLI1',
-                      'data/2024_03/PLI2',
-                      'data/2024_03/PLI3'],
-                     ['data/2023_11/PLI2',
-                      'data/2023_11/PLI3']]
+# MATCHED_SUMMARIES = [['data/2024_03/PLI1/summary.csv',
+#                       'data/2024_03/PLI2/summary.csv',
+#                       'data/2024_03/PLI3/summary.csv'],
+#                      ['data/2023_11/PLI2/summary.csv',
+#                       'data/2023_11/PLI3/summary.csv']]
 
-SPECTROGRAM_PATHS = [['data/spectrograms/2024_03/PLI2',
-                      'data/spectrograms/2024_03/PLI3',
-                      'data/spectrograms/2024_03/PLI1'],
-                     ['data/spectrograms/2023_11/PLI2',
-                      'data/spectrograms/2023_11/PLI3']]
+# COPIED_RECORDINGS = [['data/2024_03/PLI1',
+#                       'data/2024_03/PLI2',
+#                       'data/2024_03/PLI3'],
+#                      ['data/2023_11/PLI2',
+#                       'data/2023_11/PLI3']]
+
+# SPECTROGRAM_PATHS = [['data/spectrograms/2024_03/PLI2',
+#                       'data/spectrograms/2024_03/PLI3',
+#                       'data/spectrograms/2024_03/PLI1'],
+#                      ['data/spectrograms/2023_11/PLI2',
+#                       'data/spectrograms/2023_11/PLI3']]
 
 # Model config parameters
 DEVICE = utils.set_device('mps')
@@ -50,13 +54,11 @@ L1_LAMBDA = 100
 
 
 def main():
-    create_new_dataset = False
+    new_dataset = True
 
-    if create_new_dataset:
-        print(f'Creating {DATASET_PATH}\n')
+    if new_dataset:
         create_dataset(data_root=RAW_DATA,
                        dataset_root=DATASET,
-                       analysis=False,
                        matched_summaries=MATCHED_SUMMARIES,
                        copied_recordings=COPIED_RECORDINGS,
                        spectrogram_paths=SPECTROGRAM_PATHS,
