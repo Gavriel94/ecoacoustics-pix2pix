@@ -462,7 +462,6 @@ def pair_spectrograms(directories: list):
     for loc1, dt1, file1 in mic1_spectrograms:
         for loc2, dt2, file2 in mic2_spectrograms:
             if loc1 == loc2 and dt1 == dt2:
-                # pass these files straight into stitch images
                 paired_spectrograms.append((file1, file2))
 
     return paired_spectrograms
@@ -598,8 +597,6 @@ def main():
                                   verbose=True, file_limit=file_limit)
                   for summary_file in matched_summaries]
     all_recordings = [recording for year in recordings for recording in year]  # flatten list of lists
-    
-    # pair recordings from 
     print()
 
     print('Creating train/val/test split')
@@ -643,6 +640,7 @@ def main():
     
     # # merge all available spectrograms into one list
     # spectrogram_paths = [path for sublist in spectrogram_paths for path in sublist]
+    
     print('Stitching images')
     # stitch images together to create the dataset
     stitch_images(paired_train, data)

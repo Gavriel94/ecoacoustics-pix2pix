@@ -3,10 +3,11 @@ from torchvision.transforms import v2
 from torch.utils.data import Dataset
 from PIL import Image
 import numpy as np
+import math
 
 
-class SpectrogramDataset(Dataset):
-    def __init__(self, data: list, augment: bool, canvas_size: int):
+class Pix2PixDataset(Dataset):
+    def __init__(self, data: list, augment: bool):
         self.data = data
 
         self.augmentation = v2.Compose([
@@ -16,102 +17,72 @@ class SpectrogramDataset(Dataset):
             v2.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
             v2.ToDtype(torch.float32, scale=True)
         ])
-        self.normalise_greyscale = v2.Compose([
+        self.normalise = v2.Compose([
             v2.ToImage(),
-            v2.Normalize(mean=[0.5], std=[0.5])
+            # v2.Normalize(mean=[0.5], std=[0.5])
         ])
         self.to_tensor = v2.Compose([
             v2.ToImage(),
+            # v2.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
             v2.ToDtype(torch.float32, scale=True)
         ])
 
-        if (canvas_size & (canvas_size-1) == 0) and canvas_size != 0:
-            self.canvas_size = canvas_size
-        else:
-            raise NotTwoPower('canvas_size must be in the series 2^n ')
+    def calculate_padding_dimensions(self, img_shape):
+        def next_power_of_2(x):
+            return 2 ** math.ceil(math.log2(x))
+        
+        width, height = img_shape
+        target_width = max(next_power_of_2(width), width)
+        target_height = max(next_power_of_2(height), height)
 
-    def calculate_bbox(self, image_arr):
-        # Find coordinates where pixel value is 255 (white)
-        white_pixels = np.where(image_arr == 255)
-        if white_pixels[0].size == 0:  # No white area found
-            return None
+        return target_width, target_height
 
-        top = np.min(white_pixels[0])
-        bottom = np.max(white_pixels[0])
-        left = np.min(white_pixels[1])
-        right = np.max(white_pixels[1])
+    def pad_image(self, image_arr, target_width, target_height):
+        pad_width = target_width - image_arr.shape[1]
+        pad_height = target_height - image_arr.shape[0]
 
-        return top, bottom, left, right
+        pad_left = pad_width // 2
+        pad_right = pad_width - pad_left
+        pad_top = pad_height // 2
+        pad_bottom = pad_height - pad_top
+        
+        padding_coords = {
+            'left': pad_left,
+            'right': pad_right,
+            'top': pad_top,
+            'bottom': pad_bottom
+        }
 
-    def crop_canvas(self, image):
-        bbox = self.calculate_bbox(image)
-        if bbox:
-            top, bottom, left, right = bbox
-            cropped_img = image.crop((left, top, right + 1, bottom + 1))
-        else:
-            cropped_img = image  # No white area to crop, return original image
-
-        return cropped_img
+        return np.pad(image_arr,
+                      ((pad_top, pad_bottom),
+                       (pad_left, pad_right)),
+                      mode='constant',
+                      constant_values=255), padding_coords
 
     def __len__(self):
         return len(self.data)
 
-    def __getitem__(self, index: int):
-        """
-        Gets the image from the dataset and applies transformations
-        before returning it as a tensor.
+    def __getitem__(self, idx):
+        image_path = self.data[idx]
+        image = Image.open(image_path).convert('L')
+        image_arr = np.array(image)
 
-        Args:
-            index (int): Index of dataset.
+        target_width, target_height = self.calculate_padding_dimensions(image_arr.shape)
 
-        Returns:
-            Image: _description_
-        """
-        def convert_permute_transform(np_arr):
-            if np_arr.ndim == 2:  # Ensure the array has a channel dimension
-                np_arr = np.expand_dims(np_arr, axis=-1)  # Add a channel dimension
-            np_arr = torch.tensor(np_arr, dtype=torch.float32) / 255.0
-            np_arr = np_arr.permute(2, 0, 1)
-            np_arr = self.normalise_greyscale(np_arr)
-            np_arr = self.to_tensor(np_arr)
-            return np_arr
+        padded_image, padding_coords = self.pad_image(image_arr,
+                                                      target_width,
+                                                      target_height)
 
-        img_path = self.data[index]
-        img = Image.open(img_path).convert('L')
-        img_arr = np.array(img)
-        img_height, img_width = img_arr.shape
-        scale = min(self.canvas_size / img_width, self.canvas_size / img_height)
-        scaled_width = int(img_width * scale)
-        scaled_height = int(img_height * scale)
+        padded_input = padded_image[:, :padded_image.shape[1] // 2]
+        padded_target = padded_image[:, padded_image.shape[1] // 2:]
 
-        resized_img = Image.fromarray(img_arr).resize((scaled_width, scaled_height),
-                                                      Image.LANCZOS)
-        img_arr = np.array(resized_img)
+        input_tensor = self.to_tensor(padded_input)
+        target_tensor = self.to_tensor(padded_target)
+        original_size = image_arr.shape
 
-        pad_height = max(0, self.canvas_size - scaled_height)
-        pad_width = max(0, self.canvas_size - scaled_width)
-        padded_img = np.pad(img_arr, ((0, pad_height), (0, pad_width)),
-                            mode='constant', constant_values=255)
+        _, _, image_file = image_path.split('/')
 
-        padded_img = np.expand_dims(padded_img, axis=-1).astype(np.uint8)
-
-        half_width = self.canvas_size // 2
-        # extract left half of the image
-        input_arr = padded_img[:, :half_width, :]
-        # extract right half of the image
-        target_arr = padded_img[:, half_width:, :]
-
-        input_arr = input_arr.squeeze(axis=-1)
-        target_arr = target_arr.squeeze(axis=-1)
-        Image.fromarray(input_arr).save('tmp/img_left.png')
-        Image.fromarray(target_arr).save('tmp/img_right.png')
-
-        if input_arr.shape[1] != target_arr.shape[1]:
-            raise Exception(f'Shape mismatch. {input_arr.shape}, {target_arr.shape}')
-
-        input_tensor = convert_permute_transform(input_arr)
-        target_tensor = convert_permute_transform(target_arr)
-        return input_tensor, target_tensor, (img_height, img_width)
+        return input_tensor, target_tensor, original_size, padding_coords, image_file
 
 
 class NotTwoPower(Exception):
