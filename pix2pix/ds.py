@@ -80,7 +80,9 @@ class Pix2PixDataset(Dataset):
         target_tensor = self.to_tensor(padded_target)
         original_size = image_arr.shape
 
-        return input_tensor, target_tensor, original_size, padding_coords, image_path
+        _, _, image_file = image_path.split('/')
+
+        return input_tensor, target_tensor, original_size, padding_coords, image_file
 
 
 class NotTwoPower(Exception):
