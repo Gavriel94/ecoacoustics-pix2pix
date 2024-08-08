@@ -33,7 +33,7 @@ def analyse_recordings(data_root: str, dataset_root: str, verbose: bool = False)
                 df = pd.concat([df, wav_data(full_path, verbose=verbose)], ignore_index=True)
                 save_path = f'{dataset_root}analysis/{mic_dir}_data.csv'
                 df.to_csv(save_path, index=False)
-                logging.info(f'Analysis saved in {save_path}')
+                logging.info(f'Analysis added to {save_path}')
 
 
 def get_dict(num_channels: int, sample_rate: int,

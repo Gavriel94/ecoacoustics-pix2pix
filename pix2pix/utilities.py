@@ -142,7 +142,7 @@ def get_files(dataset_path: str, include_correlated: bool):
     return files_complete
 
 
-def split_data(data: list, split_percent: float, shuffle=True):
+def train_val_test_split(data: list, split_percent: float, shuffle=True):
     """
     Creates a train, val, test split.
 
