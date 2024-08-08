@@ -618,36 +618,33 @@ def main():
     # TODO pair spectrograms before creating them, then the stitched ones can be saved in the appropriate set
     
     print('Creating spectrograms')
-    train_paths = create_spectrograms(train, n_fft=4096,
-                                      set_type='train_set', dataset=data, verbose=True)
+    training_set = create_spectrograms(train, n_fft=4096,
+                                       set_type='train_set', dataset=data, verbose=True)
     
     print('train paths')
-    print(train_paths)
+    print(training_set)
     
-    val_paths = create_spectrograms(val, n_fft=4096,
-                                    set_type='val_set', dataset=data, verbose=True)
+    validation_set = create_spectrograms(val, n_fft=4096,
+                                         set_type='val_set', dataset=data, verbose=True)
     print('val_paths')
-    print(val_paths)
+    print(validation_set)
     
-    test_paths = create_spectrograms(test, n_fft=4096,
-                                     set_type='test_set', dataset=data, verbose=True)
+    test_set = create_spectrograms(test, n_fft=4096,
+                                   set_type='test_set', dataset=data, verbose=True)
     
     print('Pairing spectrograms')
-    paired_train = pair_spectrograms(train_paths)
+    paired_train = pair_spectrograms(training_set)
     print('Paired train')
-    paired_val = pair_spectrograms(val_paths)
+    paired_val = pair_spectrograms(validation_set)
     print('Paired val')
-    paired_test = pair_spectrograms(test_paths)
+    paired_test = pair_spectrograms(test_set)
     print('Paired test')
     print()
     
-
     # # merge all available spectrograms into one list
     # spectrogram_paths = [path for sublist in spectrogram_paths for path in sublist]
-    
-
-    print('Stiching images')
-    # stich images together to create the dataset
+    print('Stitching images')
+    # stitch images together to create the dataset
     stitch_images(paired_train, data)
     stitch_images(paired_val, data)
     stitch_images(paired_test, data)
