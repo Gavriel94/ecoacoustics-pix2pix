@@ -339,19 +339,20 @@ def create_spectrograms(directories: list,
     """
     if hop_length is None:
         hop_length = n_fft // 4
-    save_paths = set()
-    for directory in directories:
+    spectrogram_paths = set()
+    for i, directory in enumerate(directories):
         files = os.listdir(directory)
-        for i, file in enumerate(files):
+        for j, file in enumerate(files):
             if file.split('.')[-1] == 'csv':
                 continue
             if verbose:
                 logging.info(f'Generating spectrogram for {file}, '
-                             f'{i + 1}/{len(files)} files')
+                             f'{j + 1}/{len(files)} files\n{i + 1}/ {len(directories)}')
             path = os.path.join(directory, file)
             try:
                 y, sr = librosa.load(path)
                 s = librosa.stft(y, n_fft=n_fft, hop_length=hop_length)
+                magnitude, phase = librosa.magphase(s)
                 s_db = librosa.amplitude_to_db(np.abs(s), ref=np.max)
 
                 # normalise spectrogram to range (0, 255)
@@ -359,23 +360,40 @@ def create_spectrograms(directories: list,
                 s_db_norm = s_db_norm.astype(np.uint8)
 
                 # create path and directory
-                save_path = directory.replace(f'{root}',
-                                              f'{root}spectrograms/')
-                os.makedirs(save_path, exist_ok=True)
+                spectrogram_path = os.path.join(root, 'spectrograms')
+                os.makedirs(spectrogram_path, exist_ok=True)
                 # save image
                 image = Image.fromarray(s_db_norm)
-
+                
                 if target_width is not None:
                     aspect_ratio = image.width / image.height
                     target_height = int(target_width / aspect_ratio)
-                    image_resized = image.resize((target_width, target_height), Image.LANCZOS)
-                    image_resized.save(f"{save_path}/{file.replace('.wav', '.png')}")
-                else:
-                    image.save(f"{save_path}/{file.replace('.wav', '.png')}")
-                    save_paths.add(save_path)
+                    image = image.resize((target_width, target_height), Image.LANCZOS)
+                    
+                image.save(f"{spectrogram_path}/{file.replace('.wav', '.png')}")
+                spectrogram_paths.add(spectrogram_path)
+                
+                params = {
+                    'magnitude_real': magnitude.real.tolist(),
+                    'magnitude_imag': magnitude.imag.tolist(),
+                    'phase_real': phase.real.tolist(),
+                    'phase_imag': phase.imag.tolist(),
+                    'n_fft': n_fft,
+                    'hop_length': hop_length,
+                    'file': file
+                }
+                params_path = os.path.join(spectrogram_path, 'params')
+                os.makedirs(params_path, exist_ok=True)
+                file_path_params = os.path.join(params_path, file.replace('.wav', '.json'))
+                if verbose:
+                    print(f'Saved {file_path_params}')
+                
+                with open(file_path_params, 'w') as f:
+                    json.dump(params, f)
+                    
             except Exception as e:
                 logging.error(str(e))
-    return list(save_paths)
+    return list(spectrogram_paths)
 
 
 def pair_spectrograms(directories: list):
@@ -400,6 +418,8 @@ def pair_spectrograms(directories: list):
     for directory in directories:
         files = os.listdir(directory)
         for filename in files:
+            if filename == 'params':
+                continue
             loc, datetime = extract_datetime(filename)
             if '-4' in filename:
                 loc = loc.replace('-4', '')

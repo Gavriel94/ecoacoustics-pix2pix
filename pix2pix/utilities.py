@@ -4,12 +4,51 @@ Utility functions
 """
 import os
 import random
+import librosa
 import torch
 import matplotlib.pyplot as plt
 from PIL import Image
 import numpy as np
 import torch.nn.functional as F
 import torch.nn as nn
+import json
+import soundfile as sf
+
+
+def spectrogram_to_audio(spectrogram_path: str, output_path: str, sample_rate):
+    # open spectrogram
+    spectrogram_img = Image.open(spectrogram_path)
+    spectrogram_arr = np.array(spectrogram_img)
+
+    # get magnitude and phase values
+    root, specs, img_path = spectrogram_path.split('/')
+    params_path = os.path.join(root, specs, 'params', img_path.replace('.png', '.json'))
+    with open(params_path, 'r') as f:
+        params = json.load(f)
+        magnitude_real = np.array(params['magnitude_real'])
+        magnitude_imag = np.array(params['magnitude_imag'])
+        phase_real = np.array(params['phase_real'])
+        phase_imag = np.array(params['phase_imag'])
+
+        # recreate complex numbers
+        magnitude = magnitude_real + 1j * magnitude_imag
+        phase = phase_real + 1j * phase_imag
+
+        s_db = (spectrogram_arr / 255) * (np.max(magnitude) - np.min(magnitude)) + np.min(magnitude)
+        s = librosa.db_to_amplitude(s_db, ref=np.max(magnitude))
+
+        # shift sine waves
+        stft_matrix = s * phase
+
+        # inverse short term fourier transform
+        y = librosa.istft(stft_matrix,
+                          hop_length=params['hop_length'],
+                          win_length=params['n_fft'],
+                          length=params.get('original_length'))
+
+        output_path = os.makedirs(os.path.join(root, specs, 'spectrogram_to_audio'))
+        # save audio
+        sf.write(output_path, y, sample_rate)
 
 
 def remove_padding(tensor, original_dimensions, pad_coords: dict, is_target):
@@ -18,16 +57,9 @@ def remove_padding(tensor, original_dimensions, pad_coords: dict, is_target):
         orig_h, orig_w = original_dimensions[i]
         pad_coords = pad_coords[i]
         if is_target:
-            print('TARGET')
             cropped_tensor = tensor[i:i+1, :, pad_coords['top']:pad_coords['top'] + orig_h, :w - pad_coords['right']]
         else:
-            print('INPUT')
             cropped_tensor = tensor[i:i+1, :, pad_coords['top']:pad_coords['top'] + orig_h, pad_coords['left']:pad_coords['left'] + orig_w]
-            
-        print('tensor.shape', tensor.shape)
-        print('original_dimensions', original_dimensions[i])
-        print('pad_coords', pad_coords)
-        print('cropped_tensor.shape', cropped_tensor.shape)
         
         return cropped_tensor
 
@@ -66,8 +98,8 @@ def test_custom_l1_loss():
 
 
 def custom_collate(batch):
-    input_tensors, target_tensors, original_dimensions, padding_coords = zip(*batch)
-    return torch.stack(input_tensors), torch.stack(target_tensors), original_dimensions, padding_coords
+    input_tensors, target_tensors, original_dimensions, padding_coords, image_path = zip(*batch)
+    return torch.stack(input_tensors), torch.stack(target_tensors), original_dimensions, padding_coords, image_path
 
 
 def tensor_to_img(tensor):
