@@ -1,13 +1,6 @@
 import wave
 import os
 import pandas as pd
-import logging
-
-logging.basicConfig(format='%(asctime)s:%(message)s',
-                    level=logging.INFO,
-                    datefmt='%m/%d/%Y %I:%M:%S %p')
-
-# save the phase information
 
 
 def analyse_recordings(data_root: str, dataset_root: str, verbose: bool = False):
@@ -33,7 +26,7 @@ def analyse_recordings(data_root: str, dataset_root: str, verbose: bool = False)
                 df = pd.concat([df, wav_data(full_path, verbose=verbose)], ignore_index=True)
                 save_path = f'{dataset_root}analysis/{mic_dir}_data.csv'
                 df.to_csv(save_path, index=False)
-                logging.info(f'Analysis added to {save_path}')
+                print(f'Analysis added to {save_path}')
 
 
 def get_dict(num_channels: int, sample_rate: int,
@@ -72,7 +65,7 @@ def wav_data(directory_path: str, verbose: bool = False):
     dicts = []
     for i, file in enumerate(files):
         if verbose:
-            logging.info(f'Analysing {file} {i + 1}/{len(files)} files')
+            print(f'Analysing {file} {i + 1}/{len(files)} files')
         path = os.path.join(directory_path, file)
         try:
             with wave.open(path, 'rb') as w:
@@ -80,13 +73,14 @@ def wav_data(directory_path: str, verbose: bool = False):
                 sample_rate = w.getframerate()
                 frames = w.getnframes()
                 bit_depth = w.getsampwidth() * 8  # convert bytes to bits
-                
+
                 duration = frames / float(sample_rate)
                 dicts.append(get_dict(num_channels, sample_rate,
                              frames, bit_depth,
                              duration, path))
         except Exception as e:
-            # file is possibly corrupt
+            # file is possibly corrupt, save exception
+            exception = str(e)
             num_channels = w.getnchannels()
             sample_rate = w.getframerate()
             frames = w.getnframes()
@@ -94,5 +88,5 @@ def wav_data(directory_path: str, verbose: bool = False):
             dicts.append(get_dict(num_channels, sample_rate,
                          frames, bit_depth,
                          duration, path,
-                         str(e)))
+                         exception))
     return pd.DataFrame(dicts)

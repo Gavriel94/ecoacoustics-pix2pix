@@ -1,34 +1,31 @@
-import pandas as pd
-import os
-import librosa
-import numpy as np
-import platform
 import json
-from PIL import Image
-from scipy.signal import correlate2d
+import os
+import platform
 import random
 
-# from pix2pix.config import setup_logging
-from audio_analysis import analyse_recordings
-import logging
+import librosa
+import numpy as np
+import pandas as pd
+from PIL import Image
+from scipy.signal import correlate2d
+from tqdm import tqdm
+
 import pix2pix.utilities as utils
-
-# setup_logging()
-
-logging.basicConfig(format='%(asctime)s:%(message)s',
-                    level=print,
-                    datefmt='%m/%d/%Y %I:%M:%S %p')
-logging.getLogger('PIL').setLevel(logging.WARNING)
+from audio_analysis import analyse_recordings
+# from pix2pix.config import setup_logging
 
 
-def remove_hidden_files(data_path: str):
+def remove_hidden_files(data: str):
     """
-    Removes hidden files that Windows or macOS may generate.
+    Removes directory metadata files that Windows or macOS generate.
+
+    Args:
+        data (str): Path to folder.
     """
-    file_names = ['.DS_Store', 'desktop.ini', 'Thumbs.db']
-    for root, dirs, files in os.walk(data_path):
+    remove_files = ['.DS_Store', 'desktop.ini', 'Thumbs.db']
+    for root, dirs, files in os.walk(data):
         for file in files:
-            if file in file_names:
+            if file in remove_files:
                 file_path = os.path.join(root, file)
                 try:
                     os.remove(file_path)
@@ -37,28 +34,35 @@ def remove_hidden_files(data_path: str):
                           'Try removing manually.')
 
 
-def create_data_dict(data_from: str, data_to: str, save_json=True):
+def create_data_dict(raw_data_root: str, dataset_root: str, validate_summaries: bool):
     """
-    Creates a dictionary of paths to recordings organised by year and microphone.
-    Optionally saves the dictionary as a JSON file.
+    Creates a view of each microphone directory organised by year and microphone.
+    If the directory does not contain a summary folder, one is automatically
+    created and populated.
 
     Args:
-        data_from (str): Path of source data.
-        data_to (str): Path where dataset will be stored.
-        save_json (bool, optional): Saves data as JSON. Defaults to True.
+        raw_data_root (str): Path to raw data.
+        dataset_root (str): Path to dataset.
+        validate_summaries (bool): Ensure summary files exist.
 
     Returns:
-        dict: Data organised by year and microphone.
+        dict: Views of microphone directorys.
     """
     data_dict = {}
-    years = os.listdir(data_from)
+    years = os.listdir(raw_data_root)
     for year in years:
-        year_path = os.path.join(data_from, year)
+        year_path = os.path.join(raw_data_root, year)
         mic_dir = os.listdir(year_path)
         for mic in mic_dir:
             year_mic_path = os.path.join(year_path, mic)
-            # Check for a summary folder and create one if it does not exist
-            validate_summary_folder(year_mic_path)
+
+            # Validate or create summary files
+            if validate_summaries:
+                if 'summaries' not in os.listdir(year_mic_path):
+                    for loc in os.listdir(year_mic_path):
+                        dest = os.path.join(year_mic_path, loc)
+                        create_summary_file(dest)
+
             fol_dir = os.listdir(year_mic_path)
             for fol in fol_dir:
                 full_path = os.path.join(year_mic_path, fol)
@@ -69,63 +73,27 @@ def create_data_dict(data_from: str, data_to: str, save_json=True):
                     data_dict[year][mic] = []
 
                 data_dict[year][mic].append(full_path)
-    if save_json:
-        with open(f'{data_to}/data_dict.json', 'w') as f:
-            json.dump(data_dict, f)
+
+    # Save the dictionary as a JSON file
+    with open(f'{dataset_root}/data_dict.json', 'w') as f:
+        json.dump(data_dict, f)
+
     return data_dict
-
-
-def get_paths(data: dict, year: str, mic: str = None):
-    """
-    Get paths to all information by year or microphone.
-
-    Args:
-        data_dict (dict): Data organised by year and microphone.
-        year (str): The paths corresponding to a specific year.
-        mic (str, optional): Paths corresponding to a specific microphone.
-        Defaults to None.
-
-    Returns:
-        list | dict: List of paths if microphone is specified otherwise
-        a dictionary with the microphones and their respective data paths.
-    """
-    if mic:
-        return data.get(year, {}).get(mic, [])
-    return data.get(year, {})
-
-
-def validate_summary_folder(year_mic_path: str):
-    """
-    Ensures each micrphone directory contains a populated summary folder.
-    If some summary files are missing it may be easier to delete the entire
-    summaries folder and create a new data dictionary.
-    This will  create a new folder with a summary file for each location.
-
-    Args:
-        year_mic_path (str): Full path from root to the microphone.
-
-    Returns:
-        str: Path to the summary folder.
-    """
-    if 'summaries' not in os.listdir(year_mic_path):
-        for loc in os.listdir(year_mic_path):
-            dest = os.path.join(year_mic_path, loc)
-            print(f'Creating summary for {dest}')
-            create_summary_file(dest)
-    return os.path.join(year_mic_path, 'summaries')
 
 
 def create_summary_file(dir_path: str):
     """
-    Extracts date and time from each .wav file name to create a new summary
-    file. File names must conform to the format 'mic_YYYYMMDD_HHMMSS'.
-    For example 'SM4_20231223_195600' is a SM4 recording taken at 23/12/2023 at
+    Uses date and time extracted from file names to create a summary
+    file.
+
+    File names must conform to the format 'mic_YYYYMMDD_HHMMSS', i.e.
+    'SM4_20231223_195600' is a SM4 recording taken at 23/12/2023 at
     19:56:00.
 
     Args:
-        dir_path (str): Directory containing .wav files.
+        dir_path (str): Directory containing recordings.
     """
-    def format_date(wav_file_name):
+    def strip_underscore():
         _, date, _ = file.split('_')
         year = date[:4]
         month = date[4:6]
@@ -141,7 +109,7 @@ def create_summary_file(dir_path: str):
     # sort files by time and date
     files.sort()
     # save dates and times as defined in each wav file name
-    dic = {
+    datetime_dict = {
         'DATE': [],
         'TIME': []
     }
@@ -149,13 +117,13 @@ def create_summary_file(dir_path: str):
     last_date = None
     for i, file in enumerate(files):
         if i == 0:
-            first_date = format_date(file)
+            first_date = strip_underscore()
         elif i == len(files) - 1:
-            last_date = format_date(file)
-        out_date, out_time = format_file_name(file)
-        dic['DATE'].append(out_date)
-        dic['TIME'].append(out_time)
-    df = pd.DataFrame(dic)
+            last_date = strip_underscore()
+        out_date, out_time = translate_datetime(file)
+        datetime_dict['DATE'].append(out_date)
+        datetime_dict['TIME'].append(out_time)
+    df = pd.DataFrame(datetime_dict)
     if first_date is None:
         raise ValueError('No start date found.')
     elif last_date is None:
@@ -168,9 +136,12 @@ def create_summary_file(dir_path: str):
     df.to_csv(file_path, index=False)
 
 
-def format_file_name(file_name: str):
+def translate_datetime(file_name: str):
     """
-    Extracts the date and time from a recordings file name.
+    Translates datetime from filenames into a string format.
+
+    a file_name 2023_1128_145050 would lead to the date being
+    represented as 2023-Nov-28 and the time as 14:50:50.
 
     Args:
         file_name (str): The recordings file name.
@@ -206,14 +177,13 @@ def format_file_name(file_name: str):
     return date, time
 
 
-def match_summaries(summary_dir: list, data_to: str, verbose: bool = False):
+def match_summaries(summary_paths: list, dataset_root: str, verbose: bool = False):
     """
-    Finds matching times from different microphones for each location-based
-    summary file.
+    Inspects pairs of summary files and creates a database of matching datetimes.
 
     Args:
-        summary_dir (list): List of summary directories for a year.
-        data_to (str): Directory where dataset will be stored.
+        summary_paths (list): Paths of summary files.
+        dataset_root (str): Directory where dataset will be stored.
     """
     def create_save_path():
         """
@@ -226,14 +196,14 @@ def match_summaries(summary_dir: list, data_to: str, verbose: bool = False):
         return path
 
     # sort and collect child paths for each summary directory by location
-    loc_sorted = [sorted(os.listdir(file)) for file in summary_dir]
+    loc_sorted = [sorted(os.listdir(file)) for file in summary_paths]
     # pair summary files from corresponding microphones
     paired = list(zip(*loc_sorted))
     # prepend the full path information to the summary file
-    paired_paths = [(os.path.join(summary_dir[0], pair[0]),
-                     os.path.join(summary_dir[1], pair[1])) for pair in paired]
+    paired_paths = [(os.path.join(summary_paths[0], pair[0]),
+                     os.path.join(summary_paths[1], pair[1])) for pair in paired]
     summaries = []
-    summary_path = os.path.join(data_to, 'summary')
+    summary_path = os.path.join(dataset_root, 'summary')
     os.makedirs(summary_path, exist_ok=True)
     for pair in paired_paths:
         mic1, mic2 = pair
@@ -242,23 +212,27 @@ def match_summaries(summary_dir: list, data_to: str, verbose: bool = False):
         matches.to_csv(save_path)
         summaries.append(save_path)
         if verbose:
-            print(f"Saved matches from {pair[0].split('/')[-1]} and {pair[1].split('/')[-1]} to {save_path}")
+            print(f"Saved matches from {pair[0].split('/')[-1]}"
+                  f" and {pair[1].split('/')[-1]} to {save_path}")
     return summaries
 
 
 def match_times(mic1_summary_path: str, mic2_summary_path: str):
     """
-    Inspects summary files to find recordings taken at the same time and date.
+    Opens the summary files for both microphones and performs an inner merge to
+    find matches.
 
     Args:
-        sm4_summary_path (str): Path to SM4 summary file.
-        smmicro_summary_path (str): Path to SMMicro summary file.
+        mic1_summary_path (str): Path to mic1 summary file.
+        mic2_summary_path (str): Path to mic2 summary file.
 
     Returns:
         pd.DataFrame: Columns: DATE and TIME of matching recordings.
     """
     def normalise_df(df):
-        "Keep date and time columns and ensure there's no duplicates."
+        """
+        Keep date and time columns and ensure there's no duplicates.
+        """
         relevant_cols = ['DATE', 'TIME']
         df = df[relevant_cols]
         df = df.drop_duplicates(subset=['TIME'])
@@ -268,38 +242,34 @@ def match_times(mic1_summary_path: str, mic2_summary_path: str):
     mic2_df = pd.read_csv(mic2_summary_path)
     mic1_df = normalise_df(mic1_df)
     mic2_df = normalise_df(mic2_df)
-    matching_times = pd.merge(mic1_df, mic2_df, how='inner', on=['DATE', 'TIME'])
+    matching_times = pd.merge(mic1_df, mic2_df, how='inner', on=['DATE',
+                                                                 'TIME'])
     return matching_times
 
 
 def link_recordings(data_dict: dict,
-                   raw_data_root: str,
-                   dataset_root: str,
-                   summary_files: list,
-                   verbose: bool,
-                   file_limit: int = -1):
+                    raw_data_root: str,
+                    summary_files: list,
+                    verbose: bool,
+                    file_limit: int = -1):
     """
-    
-    Creates and populates folders with .wav files matching the times
-    in the summary files.
+    Creates a link between recordings matching from summary files and
+    their location in the raw data directory.
 
     Args:
-        data (dict): .
-        summary_paths (list): 
-        file_limit (int, optional): = -1. Default 
+        data_dict (dict): Data organised by year and microphone.
+        raw_data_root (str): Root of raw data directory.
+        dataset_root (str): Root of dataset directory.
+        summary_files (list): CSV files containing matched recording times.
+        verbose (bool): Display progress outputs.
+        file_limit (int, optional): Limit recordings from directory.
 
-    Args:
-        data_dict (dict): Paths to data organised by year and microphone.
-        data_root (str): _description_
-        dataset_root (str): _description_
-        summary_paths (list): Paths to files containing matching time and dates
-            between microphone recordings.
-        file_limit (int, optional): Limit number of files copied from
-        each folder. -1 copies all. Defaults to -1.
-        verbose (bool, optional): Display progress outputs. Defaults to True.
+    Raises:
+        ValueError: The folder containing recordings cannot be found.
 
     Returns:
-        list: Paths where files have been saved.
+        set: Full paths to recordings from both microphones for each
+        time and date in the matched summary.
     """
     recording_paths = set()
     for i, summary in enumerate(summary_files):
@@ -319,50 +289,90 @@ def link_recordings(data_dict: dict,
         for folder in recordings:
             wav_files = os.listdir(folder)
             wav_files.sort()
+
             if file_limit != -1:
+                # limit number of files
                 random.shuffle(wav_files)
-                wav_files = wav_files[:file_limit]  # limit here!
+                wav_files = wav_files[:file_limit]
+
             for i, file in enumerate(wav_files):
-                date, time = format_file_name(file)
+                date, time = translate_datetime(file)
                 for _, row in dt_df.iterrows():
                     if row['DATE'] == date and row['TIME'] == time:
                         try:
                             recording_path = os.path.join(folder, file)
-                            save_path = f'{dataset_root}{year}/{location}'
                             if verbose:
                                 print(f'Linking {recording_path}')
-                            # shutil.copy(recording, save_path)
                             recording_paths.add(recording_path)
                         except FileNotFoundError as e:
                             print(str(e))
     return list(recording_paths)
 
 
-def generate_data(pairs, n_fft, set_type, dataset_root, verbose, hop_length: int = None):
+def generate_data(data: list, n_fft: int, set_type: str,
+                  dataset_root: str, verbose: bool, hop_length: int = -1):
+    """
+    Create a dataset for a Pix2Pix model.
+
+    Generates a spectrogram for each pair of recordings and stitches the input
+    on the left and the target on the right.
+
+    There is no border or bleed between the two images.
+
+    The images are saved in `dataset_root/set_type`
+
+    Args:
+        data (list(tuple)): mic1 recording at idx[0], mic2 at idx[1].
+        n_fft (int): Number of fast Fourier transforms.
+        set_type (str): Specify train/val/test.
+        dataset_root (str): Where to save the dataset.
+        verbose (bool): Display progress outputs.
+        hop_length (int, optional): Specify hop length. Defaults to -1: hop_length = n_fft // 4.
+
+    """
     # create directory
     dir_path = os.path.join(dataset_root, set_type)
     os.makedirs(dir_path, exist_ok=True)
 
-    if hop_length is None:
+    if hop_length == -1:
         hop_length = n_fft // 4
-    for i, (mic1_audio, mic2_audio) in enumerate(pairs):
-        print(f'{i + 1}/{len(pairs)} pairs')
-        mic1_spec = create_spectrogram(mic1_audio, n_fft, set_type, dataset_root, verbose, save_mag_and_phase_params=False)
-        mic2_spec = create_spectrogram(mic2_audio, n_fft, set_type, dataset_root, verbose, save_mag_and_phase_params=True)
-        stitch_images(mic1_spec, mic2_spec, os.path.basename(mic1_audio).replace('.wav', '.png'), dir_path)
-    return dir_path
+
+    for i, (mic1_audio, mic2_audio) in enumerate(tqdm(data, desc="Processing data")):
+        mic1_spec = create_spectrogram(mic1_audio,
+                                       n_fft,
+                                       set_type,
+                                       dataset_root,
+                                       verbose,
+                                       save_mag_and_phase_params=False)
+
+        mic2_spec = create_spectrogram(mic2_audio,
+                                       n_fft,
+                                       set_type,
+                                       dataset_root,
+                                       verbose,
+                                       save_mag_and_phase_params=True
+                                       if set_type == 'test' else False)
+
+        filename = os.path.basename(mic1_audio).replace('.wav', '.png')
+        stitch_images(mic1_spec, mic2_spec,
+                      save_as=filename,
+                      dir_path=dir_path)
 
 
 def stitch_images(mic1_spec, mic2_spec, save_as, dir_path):
     """
-    Stiches SMMicro and SM4 paired spectrograms with SMMicro images on the left.
-    Matches dataset format for a pix2pix cGAN.
+    Stitches mic1 and mic2 spectrograms togethers and saves them.
+
+    Checks run to ensure the dimensions are the same. Cross correlation
+    is automatically run and any cross correlated dataset samples are
+    saved in their own folder.
 
     Args:
-        paired_spectrogram_paths (list[tuple]): SMMicro and SM4 pairs.
-        dataset_root (str): Root to the dataset.
+        mic1_spec (np.array): Spectrogram of mic1.
+        mic2_spec (np.array): Spectrogram of mic2
+        save_as (str): Save path.
+        dir_path (str): Path to parent directory.
     """
-
     def cross_correlate(spec1: np.array, spec2: np.array):
         """
         Calculates where spec2 best aligns with spec1 by finding the
@@ -372,14 +382,11 @@ def stitch_images(mic1_spec, mic2_spec, save_as, dir_path):
         y, x = np.unravel_index(np.argmax(correlation), correlation.shape)
         return x
 
-    def have_same_dimensions(spec1, spec2):
-        return spec1.shape == spec2.shape
-
-    separator_width = 0
+    separator_width = 0  # not using a separator between images anymore
     separator_colour = (255, 255, 255)
     correlated = False
-    
-    if not have_same_dimensions(mic1_spec, mic2_spec):
+
+    if not mic1_spec.shape == mic2_spec.shape:
         # align them using cross correlation
         offset = cross_correlate(mic1_spec, mic2_spec)
         correlated = True
@@ -399,21 +406,22 @@ def stitch_images(mic1_spec, mic2_spec, save_as, dir_path):
     min_width = min(mic1_width, mic2_width)
     mic1_spec = mic1_spec[:, :min_width]
     mic2_spec = mic2_spec[:, :min_width]
-    if not have_same_dimensions(mic1_spec, mic2_spec):
+    if not mic1_spec.shape == mic2_spec.shape:
         raise IndexError('Spectrograms have different dimensions')
 
+    # calculate width of two images
     extended_width = mic1_width * 2 + separator_width
     height = mic1_height
 
     # stiched aligned spectrograms on the same canvas
-    # with SMMicro on the left and SM4 on the right
     stitched = Image.new('RGB', (extended_width, height), separator_colour)
-    mic1_spec_img = Image.fromarray(mic1_spec)
-    mic2_spec_img = Image.fromarray(mic2_spec)
-    stitched.paste(mic1_spec_img, (0, 0))
-    stitched.paste(mic2_spec_img, (mic1_width + separator_width, 0))
+    mic1_spec_img = Image.fromarray(mic1_spec)  # input image
+    mic2_spec_img = Image.fromarray(mic2_spec)  # target image
+    stitched.paste(mic1_spec_img, (0, 0))  # stitch input on lhs
+    stitched.paste(mic2_spec_img, (mic1_width + separator_width, 0))  # target on rhs
 
     if correlated:
+        # save in a directory for correlated data samples
         correlated_path = os.path.join(dir_path, 'correlated')
         os.makedirs(correlated_path, exist_ok=True)
         output = os.path.join(correlated_path, save_as)
@@ -423,22 +431,41 @@ def stitch_images(mic1_spec, mic2_spec, save_as, dir_path):
     try:
         stitched.save(output)
     except SystemError as se:
-        # likely that images are larger than the canvas
-        print(f'{str(se)}\nLikely dimensions mismatch'
-                        f'Input dimensions (w x h): {mic1_width, mic1_height}\n'
-                        f'Target dimensions (w x h):{mic2_width, mic2_height}\n'
-                        f'Canvas size (w x h): {stitched.width, stitched.height}')
+        print(f'{str(se)}\nLikely dimensions mismatch\n'
+              f'Input dimensions (w x h): {mic1_width, mic1_height}\n'
+              f'Target dimensions (w x h):{mic2_width, mic2_height}\n'
+              f'Canvas size (w x h): {stitched.width, stitched.height}')
     except Exception as e:
         print(str(e))
 
 
 def create_spectrogram(wav_file: str,
-                        n_fft: int,
-                        set_type: str,
-                        dir_path: str,
-                        verbose: bool,
-                        save_mag_and_phase_params: bool,
-                        hop_length: int = None):
+                       n_fft: int,
+                       set_type: str,
+                       dataset_root: str,
+                       verbose: bool,
+                       save_mg: bool,
+                       hop_length: int = None):
+    """
+    Creates a spectrogram from a .wav file.
+
+    Magnitude and phase data from each transformation can be saved
+    for the test set as a JSON file.
+    reconstruction of audio from the spectrogram using the Griffin-Lim
+    algorithm.
+
+    Args:
+        wav_file (str): Full path to a .wav file.
+        n_fft (int): Number of fast Fourier transformations.
+        set_type (str): Specify train/val/test
+        dataset_root (str): Root to the dataset.
+        verbose (bool): Display progress outputs.
+        save_mg (bool): Save parameters as JSONs.
+        hop_length (int, optional): _description_. Defaults to None.
+
+    Returns:
+        _type_: _description_
+    """
     if hop_length is None:
         hop_length = n_fft // 4
     try:
@@ -451,40 +478,42 @@ def create_spectrogram(wav_file: str,
         s_db_norm = s_db_norm.astype(np.uint8)
 
         # create params dict for test set to revert synth spectrograms back to audio
-        if set_type == 'test':
-            if save_mag_and_phase_params:
-                magnitude, phase = librosa.magphase(s)
-                params = {
-                    'magnitude_real': magnitude.real.tolist(),
-                    'magnitude_imag': magnitude.imag.tolist(),
-                    'phase_real': phase.real.tolist(),
-                    'phase_imag': phase.imag.tolist(),
-                    'n_fft': n_fft,
-                    'hop_length': hop_length,
-                    'file': wav_file
-                }
-                params_path = os.path.join(dir_path, set_type, 'params')
-                os.makedirs(params_path, exist_ok=True)
-                file_path_params = os.path.join(params_path, wav_file.split('/')[4].replace('.wav', '.json'))
-                if verbose:
-                    print(f'Saved {file_path_params}')
+        if save_mg:
+            magnitude, phase = librosa.magphase(s)
+            # STFT parameters and complex spectrum components
+            params = {
+                'magnitude_real': magnitude.real.tolist(),
+                'magnitude_imag': magnitude.imag.tolist(),
+                'phase_real': phase.real.tolist(),
+                'phase_imag': phase.imag.tolist(),
+                'n_fft': n_fft,
+                'hop_length': hop_length,
+                'file': wav_file
+            }
+            params_path = os.path.join(dataset_root, set_type, 'params')
+            os.makedirs(params_path, exist_ok=True)
+            file_path_params = os.path.join(params_path,
+                                            wav_file.split('/')[4].replace('.wav',
+                                                                           '.json'))
+            if verbose:
+                print(f'Saved {file_path_params}')
 
-                with open(file_path_params, 'w') as f:
-                    json.dump(params, f)
+            with open(file_path_params, 'w') as f:
+                json.dump(params, f)
     except Exception as e:
         print(str(e))
     return s_db_norm
 
 
-def pair_recordings(recordings: list, mic1_name: str, mic2_name: str, mic2_symbol: str):
+def pair_recordings(recordings: list, mic1_name: str, mic2_name: str, mic2_delim: str):
     """
-    Returns tuples of matched pairs containing full paths to raw data recordings
+    Pairs full paths between matched mic1 and mic2 recordings.
 
     Args:
-        recordings (list): _description_
-        mic1_name (str): _description_
-        mic2_name (str): _description_
-        mic2_symbol (str): _description_
+        recordings (list): List of recordings.
+        mic1_name (str): Name of one microphone.
+        mic2_name (str): Name of the other microphone.
+        mic2_delim (str): Delimiter to target mic recordings.
     """
     def extract_common_part(filepath, mic_symbol):
         filename = filepath.split('/')[-1].split('.')[0]
@@ -504,8 +533,8 @@ def pair_recordings(recordings: list, mic1_name: str, mic2_name: str, mic2_symbo
             mic2_spectrograms.append(recording)
 
     # Create a dictionary to map the common parts to their respective paths
-    dict1 = {extract_common_part(f, mic2_symbol): f for f in mic1_spectrograms}
-    dict2 = {extract_common_part(f, mic2_symbol): f for f in mic2_spectrograms}
+    dict1 = {extract_common_part(f, mic2_delim): f for f in mic1_spectrograms}
+    dict2 = {extract_common_part(f, mic2_delim): f for f in mic2_spectrograms}
 
     # Find matches and return as a list of tuples
     matched_pairs = [(dict1[key], dict2[key]) for key in dict1 if key in dict2]
@@ -513,10 +542,9 @@ def pair_recordings(recordings: list, mic1_name: str, mic2_name: str, mic2_symbo
 
 
 def main():
-    raw_data = 'raw_data_test/'
+    raw_data = 'raw_data/'
     data = 'data/'
-    file_limit = -1  # -1 means all files from all folders, otherwise n files from all folders
-    
+
     # remove hidden files from macOS or Windows systems
     if platform.system() == 'Darwin' or platform.system() == 'Windows':
         remove_hidden_files(raw_data)
@@ -530,7 +558,7 @@ def main():
     print()
 
     # organise data by year and microphone
-    data_dict = create_data_dict(raw_data, data)
+    data_dict = create_data_dict(raw_data, data, validate_summaries=True)
 
     # get summary files by date
     summary_paths = {}
@@ -552,21 +580,26 @@ def main():
     # copy matching recordings from raw data to dataset folders
     recordings = [link_recordings(data_dict, raw_data,
                                   data, summary_file,
-                                  verbose=True, file_limit=file_limit)
+                                  verbose=True)
                   for summary_file in matched_summaries]
     print()
-    all_recordings = [recording for year in recordings for recording in year]  # flatten list of lists
+
+    # flatten list of lists
+    all_recordings = [recording for year in recordings for recording in year]
 
     paired = pair_recordings(all_recordings, 'SMMicro', 'SM4', '-4')
 
     train, val, test = utils.train_val_test_split(paired, 0.5, True)
 
-    print('Generating spectrograms for training set\n')
+    print('Generating spectrograms for training set')
     generate_data(train, n_fft=4096, set_type='train', dataset_root=data, verbose=True)
-    print('Generating spectrograms for validation set\n')
+    print()
+    print('Generating spectrograms for validation set')
     generate_data(val, n_fft=4096, set_type='val', dataset_root=data, verbose=True)
-    print('Generating spectrograms for test set\n')
+    print()
+    print('Generating spectrograms for test set')
     generate_data(test, n_fft=4096, set_type='test', dataset_root=data, verbose=True)
+    print()
 
 
 if __name__ == '__main__':
