@@ -32,9 +32,10 @@ L1_LAMBDA = 100
 
 
 def main():
-    train_path = '/Users/anthonygavriel/Dissertation/code/data/train'
-    train_dataset = Pix2PixDataset(train_path, augment=False)
-    print(train_dataset.__getitem__(0))
+
+    train_dataset = Pix2PixDataset(dataset='data/train', use_correlated=False, augment=False)
+    # val_dataset = Pix2PixDataset(val_paths, augment=False)
+    # test_dataset = Pix2PixDataset(test_paths, augment=False)
 
     train_loader = DataLoader(train_dataset,
                               batch_size=BATCH_SIZE,
