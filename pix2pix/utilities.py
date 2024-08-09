@@ -165,6 +165,9 @@ def train_val_test_split(data: list, split_percent: float, shuffle=True):
     train = data[: split1]
     val = data[split1: split1 + split2]
     test = data[split1 + split2: (split1 + (split2 * 2))]
+    if len(val) == 0 or len(test) == 0:
+        raise ValueError('Not enough data for train/val/test split.\n'
+                         'Try a lower split_percent')
     return train, val, test
 
 
