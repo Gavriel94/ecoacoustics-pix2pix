@@ -26,7 +26,7 @@ def train_model(discriminator, generator, data_loader, optim_discriminator, opti
         generator.train()
         train_loader_tqdm = tqdm(data_loader, leave=True)
         for idx, (input_img, target_img, original_size, padding_coords, img_names) in enumerate(train_loader_tqdm):
-            save_path = f'{run_name}/epoch_{epoch}/batch_idx_{idx}/'
+            save_path = f'{run_name}/epoch_{epoch}/batch_{idx}/'
             os.makedirs(save_path, exist_ok=True)
 
             input_img, target_img = input_img.to(device), target_img.to(device)
