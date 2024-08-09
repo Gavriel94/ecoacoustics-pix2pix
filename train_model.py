@@ -32,13 +32,9 @@ L1_LAMBDA = 100
 
 
 def main():
-    # get files from dataset
-    files = utils.get_files(DATASET_PATH, include_correlated=False)
-
-    # create train, val, test sets
-    train, _, _, = utils.train_val_test_split(files, 0.8)
-
-    train_dataset = Pix2PixDataset(train, augment=False)
+    train_path = '/Users/anthonygavriel/Dissertation/code/data/train'
+    train_dataset = Pix2PixDataset(train_path, augment=False)
+    print(train_dataset.__getitem__(0))
 
     train_loader = DataLoader(train_dataset,
                               batch_size=BATCH_SIZE,
