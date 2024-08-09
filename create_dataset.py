@@ -2,6 +2,7 @@ import json
 import os
 import platform
 import random
+import gzip
 
 import librosa
 import numpy as np
@@ -309,8 +310,10 @@ def link_recordings(data_dict: dict,
     return list(recording_paths)
 
 
-def generate_data(data: list, n_fft: int, set_type: str,
-                  dataset_root: str, verbose: bool, hop_length: int = -1):
+def generate_data(data: list, n_fft: int,
+                  set_type: str, dataset_root: str,
+                  correlate: bool, verbose: bool,
+                  hop_length: int = -1):
     """
     Create a dataset for a Pix2Pix model.
 
@@ -356,10 +359,10 @@ def generate_data(data: list, n_fft: int, set_type: str,
         filename = os.path.basename(mic1_audio).replace('.wav', '.png')
         stitch_images(mic1_spec, mic2_spec,
                       save_as=filename,
-                      dir_path=dir_path)
+                      dir_path=dir_path, correlate=correlate)
 
 
-def stitch_images(mic1_spec, mic2_spec, save_as, dir_path):
+def stitch_images(mic1_spec, mic2_spec, save_as, dir_path, correlate):
     """
     Stitches mic1 and mic2 spectrograms togethers and saves them.
 
@@ -384,19 +387,21 @@ def stitch_images(mic1_spec, mic2_spec, save_as, dir_path):
 
     separator_width = 0  # not using a separator between images anymore
     separator_colour = (255, 255, 255)
-    correlated = False
-
+    correlated = False 
     if not mic1_spec.shape == mic2_spec.shape:
-        # align them using cross correlation
-        offset = cross_correlate(mic1_spec, mic2_spec)
-        correlated = True
-        # trim spectrograms so they're the same length
-        if offset > 0:
-            mic1_spec = mic1_spec[:, offset:]
-            mic2_spec = mic2_spec[:, :mic1_spec.shape[1]]
+        if correlate:
+            # align them using cross correlation
+            offset = cross_correlate(mic1_spec, mic2_spec)
+            correlated = True
+            # trim spectrograms so they're the same length
+            if offset > 0:
+                mic1_spec = mic1_spec[:, offset:]
+                mic2_spec = mic2_spec[:, :mic1_spec.shape[1]]
+            else:
+                mic2_spec = mic2_spec[:, -offset:]
+                mic1_spec = mic1_spec[:, :mic2_spec.shape[1]]
         else:
-            mic2_spec = mic2_spec[:, -offset:]
-            mic1_spec = mic1_spec[:, :mic2_spec.shape[1]]
+            return
 
     # get dimensions
     mic1_height, mic1_width = mic1_spec.shape
@@ -476,11 +481,14 @@ def create_spectrogram(wav_file: str,
         # normalise spectrogram to range (0, 255)
         s_db_norm = 255 * (s_db - s_db.min()) / (s_db.max() - s_db.min())
         s_db_norm = s_db_norm.astype(np.uint8)
-
-        # create params dict for test set to revert synth spectrograms back to audio
+        
+        # data used to recompose back to audio
         if save_mg:
-            magnitude, phase = librosa.magphase(s)
+            params_path = os.path.join(dataset_root, set_type, 'params')
+            os.makedirs(params_path, exist_ok=True)
+            
             # STFT parameters and complex spectrum components
+            magnitude, phase = librosa.magphase(s)
             params = {
                 'magnitude_real': magnitude.real.tolist(),
                 'magnitude_imag': magnitude.imag.tolist(),
@@ -490,16 +498,15 @@ def create_spectrogram(wav_file: str,
                 'hop_length': hop_length,
                 'file': wav_file
             }
-            params_path = os.path.join(dataset_root, set_type, 'params')
-            os.makedirs(params_path, exist_ok=True)
             file_path_params = os.path.join(params_path,
                                             wav_file.split('/')[4].replace('.wav',
-                                                                           '.json'))
+                                                                           '.json.gz'))
             if verbose:
                 print(f'Saved {file_path_params}')
-
-            with open(file_path_params, 'w') as f:
+            with gzip.open(file_path_params, 'wt', encoding='UTF-8') as f:
                 json.dump(params, f)
+            # with open(file_path_params, 'w') as f:
+            #     json.dump(params, f)
     except Exception as e:
         print(str(e))
     return s_db_norm
@@ -542,8 +549,9 @@ def pair_recordings(recordings: list, mic1_name: str, mic2_name: str, mic2_delim
 
 
 def main():
-    raw_data = 'raw_data/'
+    raw_data = 'raw_data_test/'
     data = 'data/'
+    train_pct: float = 0.8  # what % of data should be in the train set
 
     # remove hidden files from macOS or Windows systems
     if platform.system() == 'Darwin' or platform.system() == 'Windows':
@@ -579,8 +587,7 @@ def main():
     print('Linking recordings')
     # copy matching recordings from raw data to dataset folders
     recordings = [link_recordings(data_dict, raw_data,
-                                  data, summary_file,
-                                  verbose=True)
+                                  summary_file, verbose=True)
                   for summary_file in matched_summaries]
     print()
 
@@ -589,16 +596,16 @@ def main():
 
     paired = pair_recordings(all_recordings, 'SMMicro', 'SM4', '-4')
 
-    train, val, test = utils.train_val_test_split(paired, 0.5, True)
+    train, val, test = utils.train_val_test_split(paired, train_pct, True)
 
     print('Generating spectrograms for training set')
-    generate_data(train, n_fft=4096, set_type='train', dataset_root=data, verbose=True)
+    generate_data(train, n_fft=4096, set_type='train', dataset_root=data, correlate=False, verbose=True)
     print()
     print('Generating spectrograms for validation set')
-    generate_data(val, n_fft=4096, set_type='val', dataset_root=data, verbose=True)
+    generate_data(val, n_fft=4096, set_type='val', dataset_root=data, correlate=False, verbose=True)
     print()
     print('Generating spectrograms for test set')
-    generate_data(test, n_fft=4096, set_type='test', dataset_root=data, verbose=True)
+    generate_data(test, n_fft=4096, set_type='test', dataset_root=data, correlate=False, verbose=True)
     print()
 
 

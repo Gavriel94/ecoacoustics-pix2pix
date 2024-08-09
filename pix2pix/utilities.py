@@ -2,6 +2,7 @@
 Utility functions
 
 """
+import gzip
 import os
 import random
 import librosa
@@ -23,7 +24,8 @@ def spectrogram_to_audio(spectrogram_path: str, output_path: str, sample_rate):
     # get magnitude and phase values
     root, specs, img_path = spectrogram_path.split('/')
     params_path = os.path.join(root, specs, 'params', img_path.replace('.png', '.json'))
-    with open(params_path, 'r') as f:
+    # with open(params_path, 'r') as f:
+    with gzip.open(params_path, 'wt') as f:  # jsons are zipped
         params = json.load(f)
         magnitude_real = np.array(params['magnitude_real'])
         magnitude_imag = np.array(params['magnitude_imag'])

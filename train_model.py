@@ -18,7 +18,7 @@ DEVICE = utils.set_device('mps')
 LEARNING_RATE = 2e-4
 BATCH_SIZE = 2
 NUM_WORKERS = 6
-NUM_EPOCHS = 2
+NUM_EPOCHS = 20
 L1_LAMBDA = 100
 
 
