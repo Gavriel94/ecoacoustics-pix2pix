@@ -1,6 +1,6 @@
 import os
-import torch.optim as optim
-import torch.nn as nn
+from torch import optim
+from torch import nn
 from torch.utils.data import DataLoader
 
 from pix2pix.dataset import Pix2PixDataset
@@ -23,7 +23,6 @@ L1_LAMBDA = 100
 
 
 def main():
-
     train_dataset = Pix2PixDataset(dataset='data/train', use_correlated=False, augment=False)
     val_dataset = Pix2PixDataset('data/val', use_correlated=False, augment=False)
     test_dataset = Pix2PixDataset('data/test', use_correlated=False, augment=False)
@@ -33,13 +32,13 @@ def main():
                               num_workers=NUM_WORKERS,
                               shuffle=True,
                               collate_fn=utils.custom_collate)
-    
+
     val_loader = DataLoader(val_dataset,
                             batch_size=BATCH_SIZE,
                             num_workers=NUM_WORKERS,
                             shuffle=True,
                             collate_fn=utils.custom_collate)
-    
+
     test_loader = DataLoader(test_dataset,
                              batch_size=BATCH_SIZE,
                              num_workers=NUM_WORKERS,
@@ -51,11 +50,11 @@ def main():
     # setting betas reduce momentum (used in the paper)
     optim_disc = optim.Adam(disc.parameters(), lr=LEARNING_RATE, betas=(0.5, 0.999))
     optim_gen = optim.Adam(gen.parameters(), lr=LEARNING_RATE, betas=(0.5, 0.999))
-    BCE = nn.BCEWithLogitsLoss()
-    L1_LOSS = nn.L1Loss()
+    bce = nn.BCEWithLogitsLoss()
+    L1_loss = nn.L1Loss()
     disc_loss, gen_loss, l1_loss = train_model(disc, gen, train_loader,
-                                               optim_disc, optim_gen, L1_LOSS, L1_LAMBDA,
-                                               BCE, NUM_EPOCHS, DEVICE)
+                                               optim_disc, optim_gen, L1_loss, L1_LAMBDA,
+                                               bce, NUM_EPOCHS, DEVICE)
     utils.plot_loss(disc_loss, gen_loss, l1_loss)
 
 
