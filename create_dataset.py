@@ -343,14 +343,14 @@ def generate_data(data: list, n_fft: int, set_type: str,
                                        set_type,
                                        dataset_root,
                                        verbose,
-                                       save_mag_and_phase_params=False)
+                                       save_mg=False)
 
         mic2_spec = create_spectrogram(mic2_audio,
                                        n_fft,
                                        set_type,
                                        dataset_root,
                                        verbose,
-                                       save_mag_and_phase_params=True
+                                       save_mg=True
                                        if set_type == 'test' else False)
 
         filename = os.path.basename(mic1_audio).replace('.wav', '.png')
