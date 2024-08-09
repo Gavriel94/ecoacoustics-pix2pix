@@ -8,9 +8,19 @@ import os
 
 
 class Pix2PixDataset(Dataset):
-    def __init__(self, data: list, augment: bool):
-        self.data = data
-
+    def __init__(self, dataset: list, use_correlated: bool, augment: bool):
+        
+        # data is a list of paths like data/train/training_spectrogram.png
+        self.data = [os.path.join(dataset, file) for file in os.listdir(dataset) if file.endswith('.png')]
+        if use_correlated:
+            if 'correlated' in os.listdir(dataset):
+                if len(os.listdir(os.path.join(dataset, 'correlated'))) == 0:
+                    raise Exception(f"Empty folder {os.path.join(dataset, 'correlated')}")
+                for file in os.listdir(os.path.join(dataset, 'correlated')):
+                    self.data.append(os.path.join(dataset, 'correlated', file))
+            else:
+                raise FileNotFoundError('No correlated directory.')
+        
         self.augmentation = v2.Compose([
             v2.Resize((224, 224)),
             v2.Pad(padding=4, fill=(0, 0, 0), padding_mode='constant'),
@@ -65,6 +75,8 @@ class Pix2PixDataset(Dataset):
 
     def __getitem__(self, idx):
         image_path = self.data[idx]
+        
+        print('Retrieving image', image_path)
         image = Image.open(image_path).convert('L')
         image_arr = np.array(image)
 
@@ -80,7 +92,7 @@ class Pix2PixDataset(Dataset):
         input_tensor = self.to_tensor(padded_input)
         target_tensor = self.to_tensor(padded_target)
         original_size = image_arr.shape
-
+        
         _, _, image_file = image_path.split('/')
 
         return input_tensor, target_tensor, original_size, padding_coords, image_file

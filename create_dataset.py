@@ -3,17 +3,13 @@ import os
 import librosa
 import numpy as np
 import platform
-import shutil
 import json
 from PIL import Image
 from scipy.signal import correlate2d
 import random
 
-from sklearn import base
-
 # from pix2pix.config import setup_logging
 from audio_analysis import analyse_recordings
-from pix2pix.utilities import train_val_test_split
 import logging
 import pix2pix.utilities as utils
 
@@ -343,7 +339,6 @@ def link_recordings(data_dict: dict,
 
 
 def generate_data(pairs, n_fft, set_type, dataset_root, verbose, hop_length: int = None):
-    print(f'Generating spectrograms for {set_type} set')
     # create directory
     dir_path = os.path.join(dataset_root, set_type)
     os.makedirs(dir_path, exist_ok=True)
@@ -559,48 +554,19 @@ def main():
                                   data, summary_file,
                                   verbose=True, file_limit=file_limit)
                   for summary_file in matched_summaries]
+    print()
     all_recordings = [recording for year in recordings for recording in year]  # flatten list of lists
 
     paired = pair_recordings(all_recordings, 'SMMicro', 'SM4', '-4')
 
     train, val, test = utils.train_val_test_split(paired, 0.5, True)
 
+    print('Generating spectrograms for training set\n')
     generate_data(train, n_fft=4096, set_type='train', dataset_root=data, verbose=True)
+    print('Generating spectrograms for validation set\n')
     generate_data(val, n_fft=4096, set_type='val', dataset_root=data, verbose=True)
+    print('Generating spectrograms for test set\n')
     generate_data(test, n_fft=4096, set_type='test', dataset_root=data, verbose=True)
-    
-    # print('Creating spectrograms')
-    # training_set = create_spectrograms(train, n_fft=4096,
-    #                                    set_type='train_set', dataset=data, verbose=True)
-    
-    # print('train paths')
-    # print(training_set)
-    
-    # validation_set = create_spectrograms(val, n_fft=4096,
-    #                                      set_type='val_set', dataset=data, verbose=True)
-    # print('val_paths')
-    # print(validation_set)
-    
-    # test_set = create_spectrograms(test, n_fft=4096,
-    #                                set_type='test_set', dataset=data, verbose=True)
-    
-    # print('Pairing spectrograms')
-    # paired_train = pair_spectrograms(training_set)
-    # print('Paired train')
-    # paired_val = pair_spectrograms(validation_set)
-    # print('Paired val')
-    # paired_test = pair_spectrograms(test_set)
-    # print('Paired test')
-    # print()
-    
-    # # # merge all available spectrograms into one list
-    # # spectrogram_paths = [path for sublist in spectrogram_paths for path in sublist]
-    
-    # print('Stitching images')
-    # # stitch images together to create the dataset
-    # stitch_images(paired_train, data)
-    # stitch_images(paired_val, data)
-    # stitch_images(paired_test, data)
 
 
 if __name__ == '__main__':
