@@ -358,8 +358,8 @@ def generate_data(data: list, n_fft: int,
 
         filename = os.path.basename(mic1_audio).replace('.wav', '.png')
         stitch_images(mic1_spec, mic2_spec,
-                      save_as=filename,
-                      dir_path=dir_path, correlate=correlate)
+                      save_as=filename, dir_path=dir_path,
+                      correlate=correlate)
 
 
 def stitch_images(mic1_spec, mic2_spec, save_as, dir_path, correlate):
@@ -387,7 +387,7 @@ def stitch_images(mic1_spec, mic2_spec, save_as, dir_path, correlate):
 
     separator_width = 0  # not using a separator between images anymore
     separator_colour = (255, 255, 255)
-    correlated = False 
+    correlated = False
     if not mic1_spec.shape == mic2_spec.shape:
         if correlate:
             # align them using cross correlation
@@ -481,12 +481,12 @@ def create_spectrogram(wav_file: str,
         # normalise spectrogram to range (0, 255)
         s_db_norm = 255 * (s_db - s_db.min()) / (s_db.max() - s_db.min())
         s_db_norm = s_db_norm.astype(np.uint8)
-        
+
         # data used to recompose back to audio
         if save_mg:
             params_path = os.path.join(dataset_root, set_type, 'params')
             os.makedirs(params_path, exist_ok=True)
-            
+
             # STFT parameters and complex spectrum components
             magnitude, phase = librosa.magphase(s)
             params = {
@@ -550,8 +550,9 @@ def pair_recordings(recordings: list, mic1_name: str, mic2_name: str, mic2_delim
 
 def main():
     raw_data = 'raw_data_test/'
-    data = 'data/'
-    train_pct: float = 0.8  # what % of data should be in the train set
+    data = 'data_test/'
+    train_pct: float = 0.5  # what % of data should be in the train set
+    verbose = True
 
     # remove hidden files from macOS or Windows systems
     if platform.system() == 'Darwin' or platform.system() == 'Windows':
@@ -562,7 +563,7 @@ def main():
 
     print('Analysing recordings')
     # list metrics for each recording and save them in the dataset folder
-    analyse_recordings(raw_data, data, verbose=False)
+    analyse_recordings(raw_data, data, verbose=verbose)
     print()
 
     # organise data by year and microphone
@@ -580,14 +581,14 @@ def main():
 
     # generate CSV files listing matched recordings from data in summary files
     print('Matching summaries')
-    matched_summaries = [match_summaries(summary_paths[year], data, verbose=True)
+    matched_summaries = [match_summaries(summary_paths[year], data, verbose=verbose)
                          for year in summary_paths.keys()]
     print()
 
     print('Linking recordings')
     # copy matching recordings from raw data to dataset folders
     recordings = [link_recordings(data_dict, raw_data,
-                                  summary_file, verbose=True)
+                                  summary_file, verbose=verbose)
                   for summary_file in matched_summaries]
     print()
 
@@ -599,13 +600,24 @@ def main():
     train, val, test = utils.train_val_test_split(paired, train_pct, True)
 
     print('Generating spectrograms for training set')
-    generate_data(train, n_fft=4096, set_type='train', dataset_root=data, correlate=False, verbose=True)
+    generate_data(train,
+                  n_fft=4096,
+                  set_type='train',
+                  dataset_root=data,
+                  correlate=False,
+                  verbose=verbose)
     print()
+
     print('Generating spectrograms for validation set')
-    generate_data(val, n_fft=4096, set_type='val', dataset_root=data, correlate=False, verbose=True)
+    generate_data(val, n_fft=4096,
+                  set_type='val', dataset_root=data,
+                  correlate=False, verbose=verbose)
     print()
+
     print('Generating spectrograms for test set')
-    generate_data(test, n_fft=4096, set_type='test', dataset_root=data, correlate=False, verbose=True)
+    generate_data(test, n_fft=4096,
+                  set_type='test', dataset_root=data,
+                  correlate=False, verbose=verbose)
     print()
 
 
