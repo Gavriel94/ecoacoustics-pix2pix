@@ -17,17 +17,15 @@ def custom_l1_loss(input, target, padding_value=1.0):
     return masked_loss.sum() / mask.sum()
 
 
-def train_model(discriminator, generator, data_loader, optim_discriminator, optim_generator, l1_loss, l1_lambda, bce_logits, num_epochs, device):
-    os.makedirs('data/evaluation', exist_ok=True)
-    run_name = f"data/evaluation/run-{len(os.listdir('data/evaluation'))}"
+def train(discriminator, generator, data_loader, optim_discriminator, optim_generator, l1_loss, l1_lambda, bce_logits, num_epochs, device, display_output: int):
+    run_name = f"data/evaluation/run_{len(os.listdir('data/evaluation')) + 1}"
+    os.makedirs(run_name, exist_ok=True)
     disc_loss, gen_loss, l1_loss = [], [], []
     for epoch in range(num_epochs):
         discriminator.train()
         generator.train()
-        train_loader_tqdm = tqdm(data_loader, leave=True)
-        for idx, (input_img, target_img, original_size, padding_coords, img_names) in enumerate(train_loader_tqdm):
-            save_path = f'{run_name}/epoch_{epoch}/batch_{idx}/'
-            os.makedirs(save_path, exist_ok=True)
+        data_loader_tqdm = tqdm(data_loader, leave=True)
+        for idx, (input_img, target_img, original_size, padding_coords, img_name) in enumerate(data_loader_tqdm):
 
             input_img, target_img = input_img.to(device), target_img.to(device)
 
@@ -55,7 +53,7 @@ def train_model(discriminator, generator, data_loader, optim_discriminator, opti
             G_loss.backward()
             optim_generator.step()
 
-            train_loader_tqdm.set_postfix({
+            data_loader_tqdm.set_postfix({
                 'D_loss': D_loss.item(),
                 'G_loss': G_loss.item(),
                 'L1_loss': L1.item()
@@ -63,22 +61,25 @@ def train_model(discriminator, generator, data_loader, optim_discriminator, opti
             disc_loss.append(D_loss.item())
             gen_loss.append(G_loss.item())
             l1_loss.append(L1.item())
-            
-            if idx % 5 == 0:
+
+            if idx % display_output == 0:
+                save_path = f'{run_name}/'
+                # os.makedirs(save_path, exist_ok=True)
+                img_name = str(img_name[-1])  # unpack from tuple
                 ut.save_tensor(
                     ut.remove_padding(input_img, original_size,
                                       padding_coords, is_target=False),
-                    os.path.join(save_path, f"{img_names[idx].replace('.png', '_input.png')}")
+                    os.path.join(run_name, f'e{epoch}_b{idx}_i_{img_name}')
                 )
                 ut.save_tensor(
                     ut.remove_padding(target_img, original_size,
                                       padding_coords, is_target=True),
-                    os.path.join(save_path, f"{img_names[idx].replace('.png', '_target.png')}")
+                    os.path.join(save_path, f'e{epoch}_b{idx}_t_{img_name}')
                 )
                 ut.save_tensor(
                     ut.remove_padding(generated_image, original_size,
                                       padding_coords, is_target=False),
-                    os.path.join(save_path, f"{img_names[idx].replace('.png', '_generated.png')}")
+                    os.path.join(save_path, f'e{epoch}_b{idx}_g_{img_name}')
                 )
 
-    return disc_loss, gen_loss, l1_loss
+    return disc_loss, gen_loss, l1_loss, run_name
