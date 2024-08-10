@@ -62,7 +62,7 @@ def remove_padding(tensor, original_dimensions, pad_coords: dict, is_target):
             cropped_tensor = tensor[i:i+1, :, pad_coords['top']:pad_coords['top'] + orig_h, :w - pad_coords['right']]
         else:
             cropped_tensor = tensor[i:i+1, :, pad_coords['top']:pad_coords['top'] + orig_h, pad_coords['left']:pad_coords['left'] + orig_w]
-        
+
         return cropped_tensor
 
 
@@ -125,11 +125,11 @@ def save_tensor(tensor, save_path):
     image.save(f'{save_path}')
 
 
-def plot_loss(disc_loss, gen_loss, l1_loss):
+def plot_loss(disc_loss, gen_loss, l1_loss, run_name):
     plt.plot(disc_loss)
     plt.plot(gen_loss)
     plt.plot(l1_loss)
-    plt.show()
+    plt.savefig(run_name)
 
 
 def get_files(dataset_path: str, include_correlated: bool):
