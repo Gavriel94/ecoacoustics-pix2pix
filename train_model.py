@@ -1,24 +1,21 @@
 import os
 from torch import optim
 from torch import nn
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
 
-from pix2pix.dataset import Pix2PixDataset
+from pix2pix.custom_dataset import Pix2PixDataset
 from pix2pix.discriminator import Discriminator
 from pix2pix.generator import Generator
+from pix2pix.custom_loss import CustomL1Loss
 from pix2pix.train import train
 import pix2pix.utilities as utils
 
 DATASET = 'data/'
-DATASET_PATH = os.path.join(DATASET, 'dataset')
-
-
-# Model config parameters
 DEVICE = utils.set_device('mps')
 LEARNING_RATE = 2e-4
 BATCH_SIZE = 2
 NUM_WORKERS = 0
-NUM_EPOCHS = 20
+NUM_EPOCHS = 3
 L1_LAMBDA = 100
 
 
@@ -51,8 +48,8 @@ def main():
     optim_disc = optim.Adam(disc.parameters(), lr=LEARNING_RATE, betas=(0.5, 0.999))
     optim_gen = optim.Adam(gen.parameters(), lr=LEARNING_RATE, betas=(0.5, 0.999))
     bce = nn.BCEWithLogitsLoss()
-    L1_loss = nn.L1Loss()
-    train(disc, gen, train_loader, optim_disc, optim_gen, L1_loss, L1_LAMBDA,
+    l1_loss = CustomL1Loss()
+    train(disc, gen, train_loader, optim_disc, optim_gen, l1_loss, L1_LAMBDA,
           bce, NUM_EPOCHS, DEVICE, save_dir=DATASET, accumulation_steps=8, display_epoch=5)
 
 

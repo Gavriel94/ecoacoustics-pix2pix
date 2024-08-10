@@ -120,11 +120,13 @@ def save_tensor_as_img(tensor, save_path):
     image.save(save_path)
 
 
-def plot_loss(disc_loss, gen_loss, l1_loss, run_name):
-    plt.plot(disc_loss)
-    plt.plot(gen_loss)
-    plt.plot(l1_loss)
-    plt.savefig(run_name)
+def save_figure(*data, title, xlabel, ylabel, save_path):
+    for d in data:
+        plt.plot(d)
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.savefig(save_path)
 
 
 def get_files(dataset_path: str, include_correlated: bool):
