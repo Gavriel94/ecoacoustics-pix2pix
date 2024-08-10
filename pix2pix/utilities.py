@@ -104,7 +104,7 @@ def custom_collate(batch):
     return torch.stack(input_tensors), torch.stack(target_tensors), original_dimensions, padding_coords, image_path
 
 
-def tensor_to_img(tensor):
+def save_tensor_as_img(tensor, save_path):
     t = tensor.cpu().detach().numpy()
     try:
         batch_size, channels, height, width = t.shape
@@ -117,12 +117,7 @@ def tensor_to_img(tensor):
     # Normalize to 0-255 range and convert to uint8
     img = ((img - img.min()) / (img.max() - img.min()) * 255).astype(np.uint8)
     image = Image.fromarray(img, mode='L')
-    return image
-
-
-def save_tensor(tensor, save_path):
-    image = tensor_to_img(tensor)
-    image.save(f'{save_path}')
+    image.save(save_path)
 
 
 def plot_loss(disc_loss, gen_loss, l1_loss, run_name):
