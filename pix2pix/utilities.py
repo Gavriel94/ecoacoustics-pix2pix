@@ -2,6 +2,7 @@
 Utility functions
 
 """
+import gzip
 import os
 import random
 import librosa
@@ -23,7 +24,8 @@ def spectrogram_to_audio(spectrogram_path: str, output_path: str, sample_rate):
     # get magnitude and phase values
     root, specs, img_path = spectrogram_path.split('/')
     params_path = os.path.join(root, specs, 'params', img_path.replace('.png', '.json'))
-    with open(params_path, 'r') as f:
+    # with open(params_path, 'r') as f:
+    with gzip.open(params_path, 'wt') as f:  # jsons are zipped
         params = json.load(f)
         magnitude_real = np.array(params['magnitude_real'])
         magnitude_imag = np.array(params['magnitude_imag'])
@@ -60,7 +62,7 @@ def remove_padding(tensor, original_dimensions, pad_coords: dict, is_target):
             cropped_tensor = tensor[i:i+1, :, pad_coords['top']:pad_coords['top'] + orig_h, :w - pad_coords['right']]
         else:
             cropped_tensor = tensor[i:i+1, :, pad_coords['top']:pad_coords['top'] + orig_h, pad_coords['left']:pad_coords['left'] + orig_w]
-        
+
         return cropped_tensor
 
 
@@ -123,11 +125,11 @@ def save_tensor(tensor, save_path):
     image.save(f'{save_path}')
 
 
-def plot_loss(disc_loss, gen_loss, l1_loss):
+def plot_loss(disc_loss, gen_loss, l1_loss, run_name):
     plt.plot(disc_loss)
     plt.plot(gen_loss)
     plt.plot(l1_loss)
-    plt.show()
+    plt.savefig(run_name)
 
 
 def get_files(dataset_path: str, include_correlated: bool):
