@@ -52,10 +52,8 @@ def main():
     optim_gen = optim.Adam(gen.parameters(), lr=LEARNING_RATE, betas=(0.5, 0.999))
     bce = nn.BCEWithLogitsLoss()
     L1_loss = nn.L1Loss()
-    disc_loss, gen_loss, l1_loss, run_name = train(disc, gen, train_loader,
-                                                   optim_disc, optim_gen, L1_loss, L1_LAMBDA,
-                                                   bce, NUM_EPOCHS, DEVICE, display_output=5)
-    utils.plot_loss(disc_loss, gen_loss, l1_loss, run_name)
+    train(disc, gen, train_loader, optim_disc, optim_gen, L1_loss, L1_LAMBDA,
+          bce, NUM_EPOCHS, DEVICE, save_dir=DATASET, accumulation_steps=8, display_epoch=5)
 
 
 if __name__ == '__main__':
