@@ -44,20 +44,53 @@ class Pix2PixDataset(Dataset):
         self.to_tensor = v2.Compose([
             v2.ToImage(),
             v2.ToDtype(torch.float32, scale=True),
-            v2.Normalize(mean=[0.5], std=[0.5])
+            # assume image is greyscale
+            v2.Normalize(mean=[0.5], std=[0.5]),
         ])
 
-    def calculate_padding_dimensions(self, img_shape):
+    def calculate_padding_dimensions(self, image_dimensions):
+        """
+        The width and height the image has to be to enable compatibility with
+        the model.
+
+        Args:
+            img_shape (np.array.shape): The current dimensions of the image.
+        """
         def next_power_of_2(x):
             return 2 ** math.ceil(math.log2(x))
 
-        width, height = img_shape
+        width, height = image_dimensions
         target_width = max(next_power_of_2(width), width)
         target_height = max(next_power_of_2(height), height)
 
         return target_width, target_height
 
     def pad_image(self, image_arr, target_width, target_height):
+        """
+        Applying padding to an image to get it at target width and height.
+
+        Padding is applied in blocks to each side. The original image remains
+        unchanged inside the padding.
+
+           +----------------+
+           |      Top       |
+           |  +----------+  |
+           |L |          | R|
+           |e | Original | i|
+           |f |  Image   | g|
+           |t |          | h|
+           |  +----------+ t|
+           |     Bottom     |
+           +----------------+
+
+        Args:
+            image_arr (_type_): _description_
+            target_width (_type_): _description_
+            target_height (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
         pad_width = target_width - image_arr.shape[1]
         pad_height = target_height - image_arr.shape[0]
 
