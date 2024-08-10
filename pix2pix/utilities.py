@@ -54,16 +54,28 @@ def spectrogram_to_audio(spectrogram_path: str, output_path: str, sample_rate):
 
 
 def remove_padding(tensor, original_dimensions, pad_coords: dict, is_target):
-    batch_size, _, h, w = tensor.shape
-    for i in range(batch_size):
-        orig_h, orig_w = original_dimensions[i]
-        pad_coords = pad_coords[i]
-        if is_target:
-            cropped_tensor = tensor[i:i+1, :, pad_coords['top']:pad_coords['top'] + orig_h, :w - pad_coords['right']]
-        else:
-            cropped_tensor = tensor[i:i+1, :, pad_coords['top']:pad_coords['top'] + orig_h, pad_coords['left']:pad_coords['left'] + orig_w]
+    try:
+        batch_size, _, h, w = tensor.shape
+        for i in range(batch_size):
+            orig_h, orig_w = original_dimensions[i]
+            pad_coords = pad_coords[i]
+            if is_target:
+                cropped_tensor = tensor[i:i+1, :, pad_coords['top']:pad_coords['top'] + orig_h, :w - pad_coords['right']]
+            else:
+                cropped_tensor = tensor[i:i+1, :, pad_coords['top']:pad_coords['top'] + orig_h, pad_coords['left']:pad_coords['left'] + orig_w]
 
-        return cropped_tensor
+            return cropped_tensor
+    except ValueError:
+        batch_size, h, w = tensor.shape
+        for i in range(batch_size):
+            orig_h, orig_w = original_dimensions[i]
+            pad_coords = pad_coords[i]
+            if is_target:
+                cropped_tensor = tensor[i:i+1, pad_coords['top']:pad_coords['top'] + orig_h, :w - pad_coords['right']]
+            else:
+                cropped_tensor = tensor[i:i+1, pad_coords['top']:pad_coords['top'] + orig_h, pad_coords['left']:pad_coords['left'] + orig_w]
+
+            return cropped_tensor
 
 
 def test_custom_l1_loss():
@@ -117,7 +129,7 @@ def save_tensor_as_img(tensor, save_path):
     # Normalize to 0-255 range and convert to uint8
     img = ((img - img.min()) / (img.max() - img.min()) * 255).astype(np.uint8)
     image = Image.fromarray(img, mode='L')
-    image.save(save_path)
+    image.save(save_path, format='png')
 
 
 def save_figure(*data, title, xlabel, ylabel, save_path):
