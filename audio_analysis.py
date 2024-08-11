@@ -1,3 +1,16 @@
+"""
+Create a database containing basic information about each recording.
+- Full path
+- Number of channels
+- Sample rate
+- Number of frames
+- Bit depth
+- Recording duration
+
+These metrics help accurate recomposition of audio from spectrograms
+and promote a better understanding of the data before any engineering.
+"""
+
 import wave
 import os
 import pandas as pd

@@ -1,8 +1,24 @@
+"""
+PyTorch based Discriminator model used in a conditional GAN.
+
+Classes:
+    - ConvBlock: Sequential model with Conv2D, InstanceNorm and LeakyReLU layers.
+    - Discriminator: Model used to distinguish between real and generated images.
+"""
+
 import torch
 import torch.nn as nn
 
 
 class ConvBlock(nn.Module):
+    """
+    Conv2D layer followed by InstanceNorm and LeakyReLU.
+
+    Args:
+        in_ch (int): Number of input channels.
+        out_ch (int): Number of output channels.
+        stride (int): Conv2D stride.
+    """
     def __init__(self, in_ch: int, out_ch: int, stride: int):
         super().__init__()
         self.conv = nn.Sequential(
@@ -12,11 +28,22 @@ class ConvBlock(nn.Module):
         )
 
     def forward(self, x):
+        """
+        Pass data through the block.
+        """
         return self.conv(x)
 
 
 class Discriminator(nn.Module):
-    def __init__(self, in_ch: int, features=[64, 128, 256, 512]):
+    """
+    Discriminator model applying a series of convolutional layers to input images to
+    classify them as real or generated.
+
+    Args:
+        in_ch (int): Number of input channels.
+        features (list[int]): List of feature sizes for each layer.
+    """
+    def __init__(self, in_ch: int, features=[128, 256, 512, 1024]):
         super().__init__()
         self.input = nn.Sequential(
             nn.Conv2d(in_ch * 2,
@@ -42,6 +69,9 @@ class Discriminator(nn.Module):
         self.gap = nn.AdaptiveAvgPool2d(1)  # global average pooling
 
     def forward(self, x, y):
+        """
+        Forward pass through the model.
+        """
         x = torch.cat([x, y], dim=1)
         x = self.input(x)
         features = self.model(x)

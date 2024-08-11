@@ -1,3 +1,8 @@
+"""
+Script where model hyperparameters and classes are instantiated for training
+and evaluation of the conditional Generative Adverserial Network.
+"""
+
 from torch import optim
 from torch import nn
 from torch.utils.data import DataLoader
@@ -5,7 +10,7 @@ from torch.utils.data import DataLoader
 from pix2pix.custom_dataset import Pix2PixDataset
 from pix2pix.discriminator import Discriminator
 from pix2pix.generator import Generator
-from pix2pix.custom_loss import CustomL1Loss
+from pix2pix.custom_loss import Pix2PixLoss
 from pix2pix.train import train
 import pix2pix.utilities as utils
 
@@ -15,7 +20,7 @@ LEARNING_RATE = 2e-4
 BATCH_SIZE = 2
 NUM_WORKERS = 0
 NUM_EPOCHS = 3
-L1_LAMBDA = 100
+L1_LAMBDA = 200  # how much weight is given to the combined L1/Intensity loss
 
 # Gradients accumulate (accumulation_steps * batch_size) steps before updating weights
 ACCUMULATION_STEPS = 4
@@ -52,11 +57,11 @@ def main():
     optim_disc = optim.Adam(disc.parameters(), lr=LEARNING_RATE, betas=(0.5, 0.999))
     optim_gen = optim.Adam(gen.parameters(), lr=LEARNING_RATE, betas=(0.5, 0.999))
     bce = nn.BCEWithLogitsLoss()
-    l1_loss = CustomL1Loss()
+    l1_loss = Pix2PixLoss(alpha=0.8)
     train(disc, gen, train_loader, val_loader,
           optim_disc, optim_gen, l1_loss, L1_LAMBDA,
           bce, NUM_EPOCHS, DEVICE, save_dir=DATASET,
-          accumulation_steps=ACCUMULATION_STEPS, display_epoch=DISPLAY_EPOCH)
+          accumulation_steps=ACCUMULATION_STEPS, view_val_epoch=DISPLAY_EPOCH)
 
 
 if __name__ == '__main__':

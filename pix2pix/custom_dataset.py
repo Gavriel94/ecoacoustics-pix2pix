@@ -1,10 +1,17 @@
-import torch
-from torchvision.transforms import v2
-from torch.utils.data import Dataset
-from PIL import Image
-import numpy as np
+"""
+Dataset implementation that separates the input and target image from
+the same canvas, and pads to a size compatible with the upsampling
+and downsampling done by the model.
+"""
+
 import math
 import os
+
+import numpy as np
+import torch
+from PIL import Image
+from torch.utils.data import Dataset
+from torchvision.transforms import v2
 
 
 class Pix2PixDataset(Dataset):

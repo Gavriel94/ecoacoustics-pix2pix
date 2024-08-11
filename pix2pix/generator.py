@@ -1,8 +1,25 @@
+"""
+PyTorch based Generator model used in a conditional GAN.
+
+Classes:
+    - DownBlock: Sequential model with Conv2D, BatchNorm2D and LeakyReLU layers.
+    - UpBlock: Sequential model with Conv2D, BatchNorm2D and LeakyReLU layers.
+    - Discriminator: Model used to distinguish between real and generated images.
+"""
+
 import torch
 import torch.nn as nn
 
 
 class DownBlock(nn.Module):
+    """
+    A downsampling block used in the conditional GAN.
+
+    Args:
+        in_ch (int): Number of input channels.
+        out_ch (int): Number of output channels.
+        use_dropout (bool, optional): Apply dropout after convolution. Default is False.
+    """
     def __init__(self, in_ch: int, out_ch: int, use_dropout: bool = False):
         super(DownBlock, self).__init__()
 
@@ -16,6 +33,9 @@ class DownBlock(nn.Module):
         self.dropout = nn.Dropout(0.2)
 
     def forward(self, x):
+        """
+        Pass data through the block.
+        """
         x = self.conv(x)
         if self.use_dropout:
             x = self.dropout(x)
@@ -23,6 +43,14 @@ class DownBlock(nn.Module):
 
 
 class UpBlock(nn.Module):
+    """
+    An upsampling block used in the conditional GAN.
+
+    Args:
+        in_ch (int): Number of input channels.
+        out_ch (int): Number of output channels.
+        use_dropout (bool, optional): Apply dropout after convolution. Default is False.
+    """
     def __init__(self, in_ch: int, out_ch: int, use_dropout: bool = False):
         super(UpBlock, self).__init__()
 
@@ -36,6 +64,9 @@ class UpBlock(nn.Module):
         self.dropout = nn.Dropout(0.2)
 
     def forward(self, x):
+        """
+        Pass data through the block.
+        """
         x = self.conv(x)
         if self.use_dropout:
             x = self.dropout(x)
@@ -43,6 +74,15 @@ class UpBlock(nn.Module):
 
 
 class Generator(nn.Module):
+    """
+    Generator model used to synthesise images based on input and target
+    images. Synthesised images must be realistic enough to fool the
+    Discriminator.
+
+    Args:
+        in_ch (int): Number of input channels
+        features (int): Number of features, defining the depth of the model.
+    """
     def __init__(self, in_ch: int, features: int):
         super().__init__()
         self.input_layer = nn.Sequential(
@@ -72,6 +112,9 @@ class Generator(nn.Module):
         )
 
     def forward(self, x):
+        """
+        Pass data through the U-Net model.
+        """
         d0 = self.input_layer(x)
         d1 = self.down1(d0)
         d2 = self.down2(d1)

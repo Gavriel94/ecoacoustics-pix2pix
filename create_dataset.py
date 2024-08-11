@@ -1,3 +1,24 @@
+"""
+Automagically creates a dataset for the Pix2Pix cGAN.
+
+The folder contains
+
+- Analysis Folder
+    - audio analysis for matched recordings from both microphones in a queryable format
+- Summary Folder
+    - Files detailing times and dates in each location where reordings match between microphones
+- Train Folder
+    - Stitched input/target images composing the training set.
+- Validation Folder
+    - Stitched input/target images composing the validation set.
+- Test Folder
+    - Params Folder
+        - Dictionaries with magnitude and phase values, for audio recomposition.
+    - Stitched input/target images composing the test set.
+- Data Dictionary
+    - This JSON file shows the view of the data this module uses.
+"""
+
 import json
 import os
 import platform
@@ -13,7 +34,6 @@ from tqdm import tqdm
 
 import pix2pix.utilities as utils
 from audio_analysis import analyse_recordings
-# from pix2pix.config import setup_logging
 
 
 def remove_hidden_files(data: str):
@@ -141,7 +161,7 @@ def translate_datetime(file_name: str):
     """
     Translates datetime from filenames into a string format.
 
-    a file_name 2023_1128_145050 would lead to the date being
+    A file_name 2023_1128_145050 would lead to the date being
     represented as 2023-Nov-28 and the time as 14:50:50.
 
     Args:
@@ -269,8 +289,7 @@ def link_recordings(data_dict: dict,
         ValueError: The folder containing recordings cannot be found.
 
     Returns:
-        set: Full paths to recordings from both microphones for each
-        time and date in the matched summary.
+        set: Full paths to matched recordings from both microphones.
     """
     recording_paths = set()
     for i, summary in enumerate(summary_files):
@@ -312,8 +331,7 @@ def link_recordings(data_dict: dict,
 
 def generate_data(data: list, n_fft: int,
                   set_type: str, dataset_root: str,
-                  correlate: bool, verbose: bool,
-                  hop_length: int = -1):
+                  correlate: bool, verbose: bool):
     """
     Create a dataset for a Pix2Pix model.
 
@@ -331,14 +349,10 @@ def generate_data(data: list, n_fft: int,
         dataset_root (str): Where to save the dataset.
         verbose (bool): Display progress outputs.
         hop_length (int, optional): Specify hop length. Defaults to -1: hop_length = n_fft // 4.
-
     """
     # create directory
     dir_path = os.path.join(dataset_root, set_type)
     os.makedirs(dir_path, exist_ok=True)
-
-    if hop_length == -1:
-        hop_length = n_fft // 4
 
     for i, (mic1_audio, mic2_audio) in enumerate(tqdm(data, desc="Processing data")):
         mic1_spec = create_spectrogram(mic1_audio,
@@ -449,15 +463,12 @@ def create_spectrogram(wav_file: str,
                        set_type: str,
                        dataset_root: str,
                        verbose: bool,
-                       save_mg: bool,
-                       hop_length: int = None):
+                       save_mg: bool):
     """
     Creates a spectrogram from a .wav file.
 
-    Magnitude and phase data from each transformation can be saved
-    for the test set as a JSON file.
-    reconstruction of audio from the spectrogram using the Griffin-Lim
-    algorithm.
+    Saves magnitude and phase data for spectrograms created for the test
+    set to be used for audio recomposition.
 
     Args:
         wav_file (str): Full path to a .wav file.
@@ -466,13 +477,11 @@ def create_spectrogram(wav_file: str,
         dataset_root (str): Root to the dataset.
         verbose (bool): Display progress outputs.
         save_mg (bool): Save parameters as JSONs.
-        hop_length (int, optional): _description_. Defaults to None.
 
     Returns:
-        _type_: _description_
+        np.array: Spectrogram as an array.
     """
-    if hop_length is None:
-        hop_length = n_fft // 4
+    hop_length = n_fft // 4
     try:
         y, sr = librosa.load(wav_file)
         s = librosa.stft(y, n_fft=n_fft, hop_length=hop_length)
@@ -503,10 +512,9 @@ def create_spectrogram(wav_file: str,
                                                                            '.json.gz'))
             if verbose:
                 print(f'Saved {file_path_params}')
+            # zip JSONs as they're quite large (170MB+)
             with gzip.open(file_path_params, 'wt', encoding='UTF-8') as f:
                 json.dump(params, f)
-            # with open(file_path_params, 'w') as f:
-            #     json.dump(params, f)
     except Exception as e:
         print(str(e))
     return s_db_norm
