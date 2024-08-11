@@ -44,8 +44,12 @@ class Pix2PixLoss(nn.Module):
         l1_loss_value = masked_l1_loss.sum() / mask.sum()
 
         # compute intensity loss
-        input_intensity = torch.mean(input * mask, dim=[1, 2, 3]) / torch.mean(mask, dim=[1, 2, 3])
-        target_intensity = torch.mean(target * mask, dim=[1, 2, 3]) / torch.mean(mask, dim=[1, 2, 3])
+        input_intensity = (torch.mean(input * mask, dim=[1, 2, 3])
+                           / torch.mean(mask, dim=[1, 2, 3]))
+
+        target_intensity = (torch.mean(target * mask, dim=[1, 2, 3])
+                            / torch.mean(mask, dim=[1, 2, 3]))
+
         intensity_loss = F.mse_loss(input_intensity, target_intensity)
 
         # combine losses

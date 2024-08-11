@@ -65,7 +65,8 @@ def train(discriminator, generator,
         discriminator.train()
         generator.train()
         data_loader_tqdm = tqdm(train_loader, leave=True)  # view progress bar while training
-        for idx, (input_img, target_img, original_size, padding_coords, img_names) in enumerate(data_loader_tqdm):
+        for idx, (input_img, target_img,
+                  original_size, padding_coords, img_names) in enumerate(data_loader_tqdm):
             input_img, target_img = input_img.to(device), target_img.to(device)
 
             # * train discriminator
@@ -121,18 +122,18 @@ def train(discriminator, generator,
 
                 # crop and save input image
                 input_cropped = ut.remove_padding(input_img[val_idx], original_size,
-                                                    padding_coords, is_target=False)
+                                                  padding_coords, is_target=False)
                 input_path = os.path.join(run_name, f'e{epoch}_b{idx}_i_{img_name}')
                 ut.save_tensor_as_img(input_cropped, input_path)
 
                 # crop and save target image
                 target_cropped = ut.remove_padding(target_img[val_idx], original_size,
-                                                    padding_coords, is_target=True)
+                                                   padding_coords, is_target=True)
                 target_path = os.path.join(run_name, f'e{epoch}_b{idx}_t_{img_name}')
                 ut.save_tensor_as_img(target_cropped, target_path)
 
                 generated_cropped = ut.remove_padding(generated_img[val_idx], original_size,
-                                                        padding_coords, is_target=False)
+                                                      padding_coords, is_target=False)
                 generated_path = os.path.join(run_name, f'e{epoch}_b{idx}_g_{img_name}')
                 ut.save_tensor_as_img(generated_cropped, generated_path)
 
@@ -144,7 +145,8 @@ def train(discriminator, generator,
 
         with torch.no_grad():
             # get a batch of validation data
-            for val_idx, (val_input, val_target, val_size, val_padding_coords, val_name) in enumerate(validation_loader):
+            for val_idx, (val_input, val_target,
+                          val_size, val_padding_coords, val_name) in enumerate(validation_loader):
                 val_input, val_target = val_input.to(device), val_target.to(device)
                 val_generated = generator(val_input)
 
@@ -157,21 +159,25 @@ def train(discriminator, generator,
                 val_dir = os.path.join(run_name, 'validation')
                 os.makedirs(val_dir, exist_ok=True)
                 for batch_idx in range(min(3, val_input.size(0))):
+                    dl = f'e{epoch}_b{batch_idx}'  # file ID
+
                     # uncomment to save input images as well
                     # val_input_cropped = ut.remove_padding(val_input[batch_idx], val_size,
                     #                                       val_padding_coords, is_target=False)
-                    # val_input_path = os.path.join(val_dir, f'e{epoch}_b{batch_idx}_i_{str(val_name[batch_idx])}')
+                    # val_input_path = os.path.join(val_dir, f'{dl}_i_{str(val_name[batch_idx])}')
                     # ut.save_tensor_as_img(val_input_cropped, val_input_path)
 
+                    # crop and save target validation image
                     val_target_cropped = ut.remove_padding(val_target[batch_idx], val_size,
                                                            val_padding_coords, is_target=True)
-                    val_target_path = os.path.join(val_dir, f'e{epoch}_b{batch_idx}_t_{str(val_name[batch_idx])}')
+                    val_target_path = os.path.join(val_dir, f'{dl}_t_{str(val_name[batch_idx])}')
                     ut.save_tensor_as_img(val_target_cropped, val_target_path)
 
-                    val_generated_cropped = ut.remove_padding(val_generated[batch_idx], val_size,
-                                                              val_padding_coords, is_target=False)
-                    val_generated_path = os.path.join(val_dir, f'e{epoch}_b{batch_idx}_g_{str(val_name[batch_idx])}')
-                    ut.save_tensor_as_img(val_generated_cropped, val_generated_path)
+                    # crop and save generated validation image
+                    val_gen_cropped = ut.remove_padding(val_generated[batch_idx], val_size,
+                                                        val_padding_coords, is_target=False)
+                    val_gen_path = os.path.join(val_dir, f'{dl}_g_{str(val_name[batch_idx])}')
+                    ut.save_tensor_as_img(val_gen_cropped, val_gen_path)
 
         # store average psnr and ssim
         avg_val_psnr = val_psnr / num_val_batches
@@ -180,7 +186,7 @@ def train(discriminator, generator,
         val_ssim_scores.append(avg_val_ssim.item())
 
         print(f'Validation PSNR: {avg_val_psnr:.4f}')  # 20-40 is best
-        print(f'Validation SSIM: {avg_val_ssim:.4f}')  # ranges between -1 to 1 with 1 'most similar'
+        print(f'Validation SSIM: {avg_val_ssim:.4f}')  # ranges between -1 to 1
         print()
 
         # final update if number of batches is not divisible by accumulation_steps
