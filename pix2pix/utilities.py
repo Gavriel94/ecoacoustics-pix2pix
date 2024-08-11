@@ -5,6 +5,7 @@ Model utility functions.
 - get_files
 - train_val_test_split
 - custom_collate
+- get_test_sample
 - spectrogram_to_audio
 - remove_padding
 - save_tensor_as_img
@@ -98,11 +99,15 @@ def train_val_test_split(data: list, split_percent: float, shuffle=True):
     """
     if shuffle:
         random.shuffle(data)
-    split1 = int(len(data) * split_percent)
-    split2 = int((len(data) - split1) / 2)
-    train = data[: split1]
-    val = data[split1: split1 + split2]
-    test = data[split1 + split2: (split1 + (split2 * 2))]
+
+    total_count = len(data)
+    train_count = int(total_count * split_percent)
+    val_count = (total_count - train_count) // 2
+
+    train = data[:train_count]
+    val = data[train_count:train_count + val_count]
+    test = data[train_count + val_count:]
+
     if len(val) == 0 or len(test) == 0:
         raise ValueError('Not enough data for train/val/test split.\n'
                          'Try a lower split_percent')
@@ -124,7 +129,46 @@ def custom_collate(batch):
             original_dimensions, padding_coords, image_path)
 
 
-def spectrogram_to_audio(spectrogram_path: str, output_path: str, sample_rate):
+def get_test_sample(dataset_root, raw_data_root, mic2_name, mic2_delim, num_samples):
+    """
+    Get random samples from the test set and return their full image path in the
+    raw data folder and its magnitude and phase parameter dictionary.
+    """
+    samples = [file for file in os.listdir(os.path.join(dataset_root, 'test'))
+               if file.endswith('.png')]
+    if len(samples) == 0:
+        raise Exception('Empty test folder')
+    if len(samples) < num_samples:
+        print(f'{num_samples} samples requested.\n'
+              f'Only {len(samples)} in test set.\n'
+              'Returning all.')
+        num_samples = len(samples)
+
+    random_samples = random.sample(samples, k=num_samples)
+
+    audio_paths = []
+    params_paths = []
+
+    for i, sample in enumerate(random_samples):
+        loc, date, time = sample.split('_')
+        filename = ''.join([loc + mic2_delim + '_', date + '_', time])
+        filename = filename.replace('.png', '.wav')
+        print(date)
+        year = date[:4] + '_' + date[4:6]
+        full_path = os.path.join(raw_data_root, year, mic2_name, loc, filename)
+        audio_paths.append(full_path)
+
+        print(f'Processed {i + 1}/{len(samples)} samples')
+
+        params_path = os.path.join(dataset_root, 'test', 'params')
+        params_paths = os.listdir(params_path)
+
+    print(params_paths)
+
+    return audio_paths
+
+
+def spectrogram_to_audio(spectrogram_path: str, dataset_root: str, output_path: str, sample_rate):
     """
     Recompose audio using magnitude and phase data retained during
     spectrogram creation.
@@ -223,7 +267,6 @@ def save_tensor_as_img(tensor, save_path):
         tensor (torch.Tensor): Image.
         save_path (str): Where to save the image. '.png' is not required.
     """
-    save_path = save_path.replace('.png', '')  # remove .png if it's there
     t = tensor.cpu().detach().numpy()  # convert tensor to np array
     # remove dimension values of 1
     try:
