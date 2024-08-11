@@ -14,7 +14,7 @@ DEVICE = utils.set_device('mps')
 LEARNING_RATE = 2e-4
 BATCH_SIZE = 2
 NUM_WORKERS = 0
-NUM_EPOCHS = 15
+NUM_EPOCHS = 3
 L1_LAMBDA = 100
 
 # Gradients accumulate (accumulation_steps * batch_size) steps before updating weights
@@ -53,8 +53,10 @@ def main():
     optim_gen = optim.Adam(gen.parameters(), lr=LEARNING_RATE, betas=(0.5, 0.999))
     bce = nn.BCEWithLogitsLoss()
     l1_loss = CustomL1Loss()
-    train(disc, gen, train_loader, val_loader, optim_disc, optim_gen, l1_loss, L1_LAMBDA,
-          bce, NUM_EPOCHS, DEVICE, save_dir=DATASET, accumulation_steps=ACCUMULATION_STEPS, display_epoch=DISPLAY_EPOCH)
+    train(disc, gen, train_loader, val_loader,
+          optim_disc, optim_gen, l1_loss, L1_LAMBDA,
+          bce, NUM_EPOCHS, DEVICE, save_dir=DATASET,
+          accumulation_steps=ACCUMULATION_STEPS, display_epoch=DISPLAY_EPOCH)
 
 
 if __name__ == '__main__':
