@@ -157,6 +157,5 @@ class Pix2PixDataset(Dataset):
         target_tensor = self.to_tensor(padded_target)
         original_size = image_arr.shape
 
-        _, _, image_name = image_path.split('/')
-
-        return input_tensor, target_tensor, original_size, padding_coords, image_name
+        return (input_tensor, target_tensor,
+                original_size, padding_coords, os.path.basename(image_path))
