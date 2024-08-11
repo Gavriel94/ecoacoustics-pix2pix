@@ -84,12 +84,12 @@ class Pix2PixDataset(Dataset):
            +----------------+
 
         Args:
-            image_arr (_type_): _description_
-            target_width (_type_): _description_
-            target_height (_type_): _description_
+            image_arr (np.array): The image as an array.
+            target_width (int): X coordinate where padding should end.
+            target_height (int): Y coordinate where padding should end.
 
         Returns:
-            _type_: _description_
+            np.array: Padded image.
         """
         pad_width = target_width - image_arr.shape[1]
         pad_height = target_height - image_arr.shape[0]
@@ -113,9 +113,25 @@ class Pix2PixDataset(Dataset):
                       constant_values=255), padding_coords
 
     def __len__(self):
+        """
+        Get the length of the dataset.
+        """
         return len(self.data)
 
     def __getitem__(self, idx):
+        """
+        Gets an item from the pix2pix dataset.
+
+        An item is an image composed of an input and target image, sharing
+        one canvas. This function pads the image, splits the image and retains
+        data for the original size to recompose later.
+
+        Args:
+            idx (int): Index of dataset.
+
+        Returns:
+            tuple: Input and target tensors, dimensions, coordinates and the filename.
+        """
         image_path = self.data[idx]
 
         image = Image.open(image_path).convert('L')
@@ -137,7 +153,3 @@ class Pix2PixDataset(Dataset):
         _, _, image_name = image_path.split('/')
 
         return input_tensor, target_tensor, original_size, padding_coords, image_name
-
-
-class NotTwoPower(Exception):
-    pass
