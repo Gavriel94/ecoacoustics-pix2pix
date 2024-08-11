@@ -11,7 +11,7 @@ from pix2pix.custom_dataset import Pix2PixDataset
 from pix2pix.discriminator import Discriminator
 from pix2pix.generator import Generator
 from pix2pix.custom_loss import Pix2PixLoss
-from pix2pix.train import train
+from pix2pix.train import train_cGAN
 import pix2pix.utilities as utils
 
 DATASET = 'data_test/'
@@ -58,10 +58,11 @@ def main():
     optim_gen = optim.Adam(gen.parameters(), lr=LEARNING_RATE, betas=(0.5, 0.999))
     bce = nn.BCEWithLogitsLoss()
     l1_loss = Pix2PixLoss(alpha=0.8)
-    train(disc, gen, train_loader, val_loader,
-          optim_disc, optim_gen, l1_loss, L1_LAMBDA,
-          bce, NUM_EPOCHS, DEVICE, save_dir=DATASET,
-          accumulation_steps=ACCUMULATION_STEPS, view_val_epoch=DISPLAY_EPOCH)
+
+    train_cGAN(disc, gen, train_loader, val_loader,
+               optim_disc, optim_gen, l1_loss, L1_LAMBDA,
+               bce, NUM_EPOCHS, DEVICE, save_dir=DATASET,
+               accumulation_steps=ACCUMULATION_STEPS, view_val_epoch=DISPLAY_EPOCH)
 
 
 if __name__ == '__main__':

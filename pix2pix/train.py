@@ -12,7 +12,7 @@ from tqdm import tqdm
 from . import utilities as ut
 
 
-def train(discriminator, generator,
+def train_cGAN(discriminator, generator,
           train_loader, validation_loader,
           optim_discriminator, optim_generator,
           custom_loss, loss_lambda,
