@@ -52,7 +52,6 @@ class Pix2PixLoss(nn.Module):
         total_loss = (1 - self.alpha) * l1_loss_value + self.alpha * intensity_loss
         return total_loss
 
-
     def test_custom_l1_loss(self):
         """
         Compare a padded and unpadded tensor to see if the loss values
