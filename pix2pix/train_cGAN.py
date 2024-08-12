@@ -3,6 +3,7 @@ Train the spectrogram translation conditional Generative Adversial Network.
 """
 
 import os
+import json
 
 import torch
 from torchmetrics.image import (PeakSignalNoiseRatio,
@@ -12,13 +13,13 @@ from tqdm import tqdm
 from . import utilities as ut
 
 
-def train(discriminator, generator,
-          train_loader, validation_loader,
-          optim_discriminator, optim_generator,
-          custom_loss, loss_lambda,
-          bce_logits, num_epochs,
-          device, save_dir: str,
-          accumulation_steps, view_val_epoch: int = 5):
+def train_cGAN(discriminator, generator,
+               train_loader, validation_loader,
+               optim_discriminator, optim_generator,
+               custom_loss, loss_lambda,
+               bce_logits, num_epochs,
+               device, save_dir: str,
+               accumulation_steps, save_images: int = 5):
     """
     Train the conditional Generative Adverserial Network (cGAN).
 
@@ -49,17 +50,24 @@ def train(discriminator, generator,
         accumulation_steps (int): Steps before updating gradients. Simulates batching.
         view_val_epoch (int, optional): View attempts on validation data. Defaults to 5.
     """
-    os.makedirs(f'{save_dir}/evaluation', exist_ok=True)
-    num_runs = len(os.listdir(f'{save_dir}/evaluation'))
-    run_name = f"{save_dir}/evaluation/run_{num_runs + 1}"
+    runs_dir = os.path.join(save_dir, 'runs')
+    os.makedirs(runs_dir, exist_ok=True)
+    run_num = int(len(os.listdir(runs_dir))) + 1
+    run_name = os.path.join(runs_dir, f'run_{run_num}')
     os.makedirs(run_name, exist_ok=True)
 
-    disc_losses, gen_losses, l1_losses = [], [], []
-    val_psnr_scores, val_ssim_scores = [], []
+    metrics = {
+        'disc_losses': [],
+        'gen_losses': [],
+        'custom_loss_losses': [],
+        'avg_psnrs': [],
+        'avg_ssims': []
+    }
+
     psnr = PeakSignalNoiseRatio().to(device)
     ssim = StructuralSimilarityIndexMeasure().to(device)
 
-    print(f'Run {num_runs + 1}')
+    print(f'Run {run_num}')
     for epoch in range(num_epochs):
         print(f'Epoch {epoch + 1}')
         discriminator.train()
@@ -100,9 +108,9 @@ def train(discriminator, generator,
             })
 
             # save metrics
-            disc_losses.append(D_loss.item())
-            gen_losses.append(G_loss.item())
-            l1_losses.append(l1_intensity_aware_loss.item())
+            metrics['disc_losses'].append(D_loss.item())
+            metrics['gen_losses'].append(G_loss.item())
+            metrics['custom_loss_losses'].append(l1_intensity_aware_loss.item())
 
             # update weights with accumulated gradients
             if (idx + 1) % accumulation_steps == 0:
@@ -111,31 +119,30 @@ def train(discriminator, generator,
                 optim_discriminator.zero_grad()
                 optim_generator.zero_grad()
 
-        # save images to disk for inspection
-        if idx % view_val_epoch == 0:
-            batch_size = input_img.size(0)
-            for val_idx in range(batch_size):
-                # os.makedirs(save_path, exist_ok=True)
+            # save image at batch for inspection
+            if idx == save_images:
                 batch_size = input_img.size(0)
-                for val_idx in range(batch_size):
-                    img_name = img_names[val_idx]
+                for batch_idx in range(batch_size):
+                    img_name = img_names[batch_idx]
 
-                # crop and save input image
-                input_cropped = ut.remove_padding(input_img[val_idx], original_size,
-                                                  padding_coords, is_target=False)
-                input_path = os.path.join(run_name, f'e{epoch}_b{idx}_i_{img_name}')
-                ut.save_tensor_as_img(input_cropped, input_path)
-
-                # crop and save target image
-                target_cropped = ut.remove_padding(target_img[val_idx], original_size,
-                                                   padding_coords, is_target=True)
-                target_path = os.path.join(run_name, f'e{epoch}_b{idx}_t_{img_name}')
-                ut.save_tensor_as_img(target_cropped, target_path)
-
-                generated_cropped = ut.remove_padding(generated_img[val_idx], original_size,
+                    # crop and save input image
+                    input_cropped = ut.remove_padding(input_img[batch_idx], original_size,
                                                       padding_coords, is_target=False)
-                generated_path = os.path.join(run_name, f'e{epoch}_b{idx}_g_{img_name}')
-                ut.save_tensor_as_img(generated_cropped, generated_path)
+                    input_path = os.path.join(run_name, f'e{epoch}_b{idx}_i_{img_name}')
+                    print(input_path)
+                    print(type(input_cropped))
+                    ut.save_tensor_as_img(input_cropped, input_path)
+
+                    # crop and save target image
+                    target_cropped = ut.remove_padding(target_img[batch_idx], original_size,
+                                                       padding_coords, is_target=True)
+                    target_path = os.path.join(run_name, f'e{epoch}_b{idx}_t_{img_name}')
+                    ut.save_tensor_as_img(target_cropped, target_path)
+
+                    generated_cropped = ut.remove_padding(generated_img[batch_idx], original_size,
+                                                          padding_coords, is_target=False)
+                    generated_path = os.path.join(run_name, f'e{epoch}_b{idx}_g_{img_name}')
+                    ut.save_tensor_as_img(generated_cropped, generated_path)
 
         # validation step
         generator.eval()
@@ -155,35 +162,34 @@ def train(discriminator, generator,
                 val_ssim += ssim(val_generated, val_target)
                 num_val_batches += 1
 
-            if idx % view_val_epoch == 0:
-                val_dir = os.path.join(run_name, 'validation')
-                os.makedirs(val_dir, exist_ok=True)
-                for batch_idx in range(min(3, val_input.size(0))):
-                    dl = f'e{epoch}_b{batch_idx}'  # file ID
+            val_dir = os.path.join(run_name, 'validation')
+            os.makedirs(val_dir, exist_ok=True)
+            for batch_idx in range(min(3, val_input.size(0))):
+                dl = f'e{epoch}_b{batch_idx}'  # file ID
 
-                    # uncomment to save input images as well
-                    # val_input_cropped = ut.remove_padding(val_input[batch_idx], val_size,
-                    #                                       val_padding_coords, is_target=False)
-                    # val_input_path = os.path.join(val_dir, f'{dl}_i_{str(val_name[batch_idx])}')
-                    # ut.save_tensor_as_img(val_input_cropped, val_input_path)
+                # uncomment to save input images as well
+                # val_input_cropped = ut.remove_padding(val_input[batch_idx], val_size,
+                #                                       val_padding_coords, is_target=False)
+                # val_input_path = os.path.join(val_dir, f'{dl}_i_{str(val_name[batch_idx])}')
+                # ut.save_tensor_as_img(val_input_cropped, val_input_path)
 
-                    # crop and save target validation image
-                    val_target_cropped = ut.remove_padding(val_target[batch_idx], val_size,
-                                                           val_padding_coords, is_target=True)
-                    val_target_path = os.path.join(val_dir, f'{dl}_t_{str(val_name[batch_idx])}')
-                    ut.save_tensor_as_img(val_target_cropped, val_target_path)
+                # crop and save target validation image
+                val_target_cropped = ut.remove_padding(val_target[batch_idx], val_size,
+                                                       val_padding_coords, is_target=True)
+                val_target_path = os.path.join(val_dir, f'{dl}_t_{str(val_name[batch_idx])}')
+                ut.save_tensor_as_img(val_target_cropped, val_target_path)
 
-                    # crop and save generated validation image
-                    val_gen_cropped = ut.remove_padding(val_generated[batch_idx], val_size,
-                                                        val_padding_coords, is_target=False)
-                    val_gen_path = os.path.join(val_dir, f'{dl}_g_{str(val_name[batch_idx])}')
-                    ut.save_tensor_as_img(val_gen_cropped, val_gen_path)
+                # crop and save generated validation image
+                val_gen_cropped = ut.remove_padding(val_generated[batch_idx], val_size,
+                                                    val_padding_coords, is_target=False)
+                val_gen_path = os.path.join(val_dir, f'{dl}_g_{str(val_name[batch_idx])}')
+                ut.save_tensor_as_img(val_gen_cropped, val_gen_path)
 
         # store average psnr and ssim
         avg_val_psnr = val_psnr / num_val_batches
         avg_val_ssim = val_ssim / num_val_batches
-        val_psnr_scores.append(avg_val_psnr.item())
-        val_ssim_scores.append(avg_val_ssim.item())
+        metrics['avg_psnrs'].append(avg_val_psnr.item())
+        metrics['avg_ssims'].append(avg_val_ssim.item())
 
         print(f'Validation PSNR: {avg_val_psnr:.4f}')  # 20-40 is best
         print(f'Validation SSIM: {avg_val_ssim:.4f}')  # ranges between -1 to 1
@@ -197,52 +203,56 @@ def train(discriminator, generator,
             optim_generator.zero_grad()
 
     # make directory for metrics captured during training
-    graphs_path = os.path.join(run_name, 'graphs')
-    os.makedirs(graphs_path, exist_ok=True)
+    metrics_path = os.path.join(run_name, 'metrics')
+    os.makedirs(metrics_path, exist_ok=True)
 
     # plot and save discriminator loss
-    disc_path = os.path.join(graphs_path, 'disc_loss')
-    ut.save_figure(disc_losses,
+    disc_path = os.path.join(metrics_path, 'disc_loss')
+    ut.save_figure(metrics['disc_losses'],
                    title='Discriminator Loss',
                    xlabel='Epoch',
                    ylabel='Loss',
                    save_path=disc_path)
 
     # plot and save generator loss
-    gen_path = os.path.join(graphs_path, 'gen_loss')
-    ut.save_figure(gen_losses,
+    gen_path = os.path.join(metrics_path, 'gen_loss')
+    ut.save_figure(metrics['gen_losses'],
                    title='Generator Loss',
                    xlabel='Epoch',
                    ylabel='Loss',
                    save_path=gen_path)
 
     # compare discriminator and generator loss
-    disc_gen_path = os.path.join(graphs_path, 'disc_gen_loss')
-    ut.save_figure(disc_losses,
-                   gen_losses,
+    disc_gen_path = os.path.join(metrics_path, 'disc_gen_loss')
+    ut.save_figure(metrics['disc_losses'],
+                   metrics['gen_losses'],
                    title='Discriminator and Generator Loss',
                    xlabel='Epoch',
                    ylabel='Loss',
                    save_path=disc_gen_path)
 
     # plot and save L1 loss
-    l1_path = os.path.join(graphs_path, 'l1_loss')
-    ut.save_figure(l1_losses,
+    l1_path = os.path.join(metrics_path, 'l1_loss')
+    ut.save_figure(metrics['custom_loss_losses'],
                    title='L1 Loss',
                    xlabel='Epoch',
                    ylabel='Loss',
                    save_path=l1_path)
 
-    psnr_path = os.path.join(graphs_path, 'psnr')
-    ut.save_figure(val_psnr_scores,
+    psnr_path = os.path.join(metrics_path, 'psnr')
+    ut.save_figure(metrics['avg_psnrs'],
                    title='Validation PSNR',
                    xlabel='Epoch',
                    ylabel='PSNR',
                    save_path=psnr_path)
 
-    ssim_path = os.path.join(graphs_path, 'ssim')
-    ut.save_figure(val_ssim_scores,
+    ssim_path = os.path.join(metrics_path, 'ssim')
+    ut.save_figure(metrics['avg_ssims'],
                    title='Validation SSIM',
                    xlabel='Epoch',
                    ylabel='SSIM',
                    save_path=ssim_path)
+
+    # save all metrics for inspection and clarity
+    with open(os.path.join(metrics_path, 'metrics.json'), 'w') as f:
+        json.dump(metrics, f)

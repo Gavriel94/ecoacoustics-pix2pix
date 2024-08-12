@@ -1,6 +1,43 @@
 """
 Automagically creates a dataset for the Pix2Pix cGAN.
 
+### RAW_DATA_ROOT
+
+The path to the directory containing all of the raw data.
+The data must be organised in this way.
+
+Set RAW_DATA_ROOT as path in `config.py`.
+
+```python
+raw_data/
+└── year/
+    ├── microphone_1/
+    │   ├── location_1/
+    │   └── location_2/
+    └── microphone_2/
+        ├── location_1/
+        └── location_2/
+```
+
+### DATASET_ROOT
+
+The generated dataset.
+
+Set DATASET_ROOT as path in `config.py`.
+
+```python
+data/
+├── analysis/
+│   ├── microphone_1_data.csv
+│   └── microphone_2_data.csv
+├── summary/
+│   └── location_data.csv
+├── train/
+├── val/
+├── test/
+└── data_dict.json
+```
+
 The folder contains
 
 - Analysis Folder
@@ -32,6 +69,7 @@ from PIL import Image
 from scipy.signal import correlate2d
 from tqdm import tqdm
 
+import config
 import pix2pix.utilities as utils
 from audio_analysis import analyse_recordings
 
@@ -329,9 +367,8 @@ def link_recordings(data_dict: dict,
     return list(recording_paths)
 
 
-def generate_data(data: list, n_fft: int,
-                  set_type: str, dataset_root: str,
-                  correlate: bool, verbose: bool):
+def generate_data(data: list, n_fft: int, set_type: str,
+                  dataset_root: str, correlate: bool, verbose: bool):
     """
     Create a dataset for a Pix2Pix model.
 
@@ -354,21 +391,22 @@ def generate_data(data: list, n_fft: int,
     dir_path = os.path.join(dataset_root, set_type)
     os.makedirs(dir_path, exist_ok=True)
 
+    save_params = True if set_type == 'test' else False
+
     for i, (mic1_audio, mic2_audio) in enumerate(tqdm(data, desc="Processing data")):
         mic1_spec = create_spectrogram(mic1_audio,
                                        n_fft,
                                        set_type,
                                        dataset_root,
                                        verbose,
-                                       save_mg=False)
+                                       save_params=False)  # only need params from the target mic
 
         mic2_spec = create_spectrogram(mic2_audio,
                                        n_fft,
                                        set_type,
                                        dataset_root,
                                        verbose,
-                                       save_mg=True
-                                       if set_type == 'test' else False)
+                                       save_params=save_params)
 
         filename = os.path.basename(mic1_audio).replace('.wav', '.png')
         stitch_images(mic1_spec, mic2_spec,
@@ -458,12 +496,9 @@ def stitch_images(mic1_spec, mic2_spec, save_as, dir_path, correlate):
         print(str(e))
 
 
-def create_spectrogram(wav_file: str,
-                       n_fft: int,
-                       set_type: str,
-                       dataset_root: str,
-                       verbose: bool,
-                       save_mg: bool):
+def create_spectrogram(wav_file: str, n_fft: int,
+                       set_type: str, dataset_root: str,
+                       verbose: bool, save_params: bool):
     """
     Creates a spectrogram from a .wav file.
 
@@ -476,7 +511,7 @@ def create_spectrogram(wav_file: str,
         set_type (str): Specify train/val/test
         dataset_root (str): Root to the dataset.
         verbose (bool): Display progress outputs.
-        save_mg (bool): Save parameters as JSONs.
+        save_mg (bool): Save data for audio recomposition.
 
     Returns:
         np.array: Spectrogram as an array.
@@ -492,7 +527,7 @@ def create_spectrogram(wav_file: str,
         s_db_norm = s_db_norm.astype(np.uint8)
 
         # data used to recompose back to audio
-        if save_mg:
+        if save_params and set_type == 'test':
             params_path = os.path.join(dataset_root, set_type, 'params')
             os.makedirs(params_path, exist_ok=True)
 
@@ -507,14 +542,13 @@ def create_spectrogram(wav_file: str,
                 'hop_length': hop_length,
                 'file': wav_file
             }
-            file_path_params = os.path.join(params_path,
-                                            wav_file.split('/')[4].replace('.wav',
-                                                                           '.json.gz'))
-            if verbose:
-                print(f'Saved {file_path_params}')
+            params_file_name = wav_file.split('/')[4].replace('.wav', '.json.gz')
+            file_path_params = os.path.join(params_path, params_file_name)
             # zip JSONs as they're quite large (170MB+)
             with gzip.open(file_path_params, 'wt', encoding='UTF-8') as f:
                 json.dump(params, f)
+            if verbose:
+                print(f'Saved {set_type} set {file_path_params}')
     except Exception as e:
         print(str(e))
     return s_db_norm
@@ -532,7 +566,7 @@ def pair_recordings(recordings: list, mic1_name: str, mic2_name: str, mic2_delim
     """
     def extract_common_part(filepath, mic_symbol):
         filename = filepath.split('/')[-1].split('.')[0]
-        # Remove the mic2 symbol and the dash
+        # Remove the mic2 symbol
         common_part = filename.replace(mic_symbol, '')
         return common_part
 
@@ -557,8 +591,9 @@ def pair_recordings(recordings: list, mic1_name: str, mic2_name: str, mic2_delim
 
 
 def main():
-    raw_data = 'raw_data_test/'
-    data = 'data_test/'
+    raw_data = config.RAW_DATA_ROOT
+    data = config.DATASET_ROOT
+
     train_pct: float = 0.5  # what % of data should be in the train set
     verbose = True
 
@@ -608,12 +643,9 @@ def main():
     train, val, test = utils.train_val_test_split(paired, train_pct, True)
 
     print('Generating spectrograms for training set')
-    generate_data(train,
-                  n_fft=4096,
-                  set_type='train',
-                  dataset_root=data,
-                  correlate=False,
-                  verbose=verbose)
+    generate_data(train, n_fft=4096,
+                  set_type='train', dataset_root=data,
+                  correlate=False, verbose=verbose)
     print()
 
     print('Generating spectrograms for validation set')
