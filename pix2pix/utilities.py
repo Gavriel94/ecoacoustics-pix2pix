@@ -153,22 +153,18 @@ def get_test_sample(dataset_root, raw_data_root, mic2_name, mic2_delim, num_samp
         loc, date, time = sample.split('_')
         filename = ''.join([loc + mic2_delim + '_', date + '_', time])
         filename = filename.replace('.png', '.wav')
-        print(date)
         year = date[:4] + '_' + date[4:6]
         full_path = os.path.join(raw_data_root, year, mic2_name, loc, filename)
         audio_paths.append(full_path)
 
-        print(f'Processed {i + 1}/{len(samples)} samples')
-
         params_path = os.path.join(dataset_root, 'test', 'params')
         params_paths = os.listdir(params_path)
 
-    print(params_paths)
+        print(f'Processed {i + 1}/{len(samples)} samples')
+    return audio_paths, params_paths
 
-    return audio_paths
 
-
-def spectrogram_to_audio(spectrogram_path: str, dataset_root: str, output_path: str, sample_rate):
+def spectrogram_to_audio(spectrogram_path: str, params_path: str, dataset_root: str, output_path: str, sample_rate):
     """
     Recompose audio using magnitude and phase data retained during
     spectrogram creation.
@@ -182,10 +178,6 @@ def spectrogram_to_audio(spectrogram_path: str, dataset_root: str, output_path: 
     spectrogram_img = Image.open(spectrogram_path)
     spectrogram_arr = np.array(spectrogram_img)
 
-    # get magnitude and phase values
-    root, specs, img_path = spectrogram_path.split('/')
-    params_path = os.path.join(root, specs, 'params', img_path.replace('.png',
-                                                                       '.json'))
     # with open(params_path, 'r') as f:
     with gzip.open(params_path, 'wt') as f:  # jsons are zipped
         params = json.load(f)
