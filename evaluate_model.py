@@ -1,7 +1,12 @@
 """
 Evaluates the model on test data.
 
-Creates an `evaluate` folder in the dataset
+Creates and populates a folder 'evaluate' in the dataset folder with
+- Audio recomposed from synthesised spectrograms, using their target's magnitude and phase.
+- Images of generated and associative real spectrograms saved during testing.
+- Graphs with average PSNR and SSIM data.
+- A table of acoustic indices that compare generated and target audio files.
+- A table of birds as predicted by BirdNet on generated and target audio files.
 """
 import os
 
@@ -9,6 +14,7 @@ import torch
 from torch.utils.data import DataLoader
 
 import config
+import pix2pix.model_utils as m_utils
 from Acoustic_Indices.main_compute_indices_from_dir import compute_indices
 import utilities as utils
 from pix2pix.dataset_eval import Pix2PixEvalDataset
@@ -37,7 +43,7 @@ def main():
                              batch_size=config.BATCH_SIZE,
                              num_workers=config.NUM_WORKERS,
                              shuffle=True,
-                             collate_fn=utils.eval_collate)
+                             collate_fn=m_utils.eval_collate)
 
     # get saved model
     run_num = 1
@@ -49,21 +55,23 @@ def main():
     test_model(test_loader, gen, config.DEVICE, data, run_num)
 
     # compute acoustic indices
-    gen_audio_root = os.listdir(os.path.join(data, 'evaluate', 'audio'))
+    gen_audio_root = os.path.join(data, 'evaluate', 'audio')
+    gen_audio = os.listdir(gen_audio_root)
+    summaries_root = os.path.join(raw_data, 'full_summaries')
+
     # get full paths to generated .wav files
     full_gen_paths = [os.path.join(data, 'evaluate', 'audio', name)
-                      for name in gen_audio_root]
+                      for name in gen_audio]
     # compute indices
     compute_indices(full_gen_paths, os.path.join(data, 'evaluate'), mic_delim, True)
 
     # get full paths to target .wav files
-    full_target_paths = utils.get_raw_audio(gen_audio_root, raw_data, 'SM4', '-4')
+    full_target_paths = utils.get_raw_audio(gen_audio, raw_data, 'SM4', '-4')
     # compute indices
     compute_indices(full_target_paths, os.path.join(data, 'evaluate'), mic_delim, False)
 
-    # BirdNet analysis
-    summaries_root = os.path.join(data, 'full_summaries')
-    birdnet_analysis(summaries_root, gen_audio_root, num_samples=3)
+    # compare generated and raw audio with BirdNet
+    birdnet_analysis(summaries_root, gen_audio_root, num_samples=1)
 
 
 if __name__ == '__main__':
