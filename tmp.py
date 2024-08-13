@@ -6,7 +6,7 @@ from datetime import datetime
 import random
 from birdnetlib import Recording
 from birdnetlib.analyzer import Analyzer
-import json
+from collections import defaultdict
 
 
 def format_datetime(date_str):
@@ -79,10 +79,16 @@ def birdnet_analysis(summaries_root, gen_audio_root, audio_samples=[], num_sampl
     Raises:
         ValueError: _description_
     """
-    if num_samples <= 0:
+    if num_samples <= 0 and len(audio_samples) == 0:
         raise ValueError('Must analyse at least 1 sample.')
-    # generates a df of summary data for all audio files
-    audio_df = match_audio_summary(summaries_root, gen_audio_root, save=True)
+
+    full_summaries_path = os.path.join(summaries_root, 'full_summaries.csv')
+    if not os.path.exists(full_summaries_path):
+        # generates a df of summary data for all audio files
+        audio_df = match_audio_summary(summaries_root, gen_audio_root)
+        audio_df.to_csv(full_summaries_path)
+    else:
+        audio_df = pd.read_csv(full_summaries_path)
 
     if len(audio_samples) == 0:
         audio_samples = random.sample(os.listdir(gen_audio_root), num_samples)
@@ -100,9 +106,9 @@ def birdnet_analysis(summaries_root, gen_audio_root, audio_samples=[], num_sampl
         'Nov': '11',
         'Dec': '12'
     }
-    analysis_root = os.path.join(config.DATASET_ROOT, 'evaluate', 'birdnet_results')
-    os.makedirs(analysis_root, exist_ok=True)
+
     analyzer = Analyzer()
+    results = []
     for audio in audio_samples:
         raw_audio = utils.get_raw_audio(audio, config.RAW_DATA_ROOT, 'SM4', '-4')
         date, time = utils.filename_to_datetime(audio)
@@ -131,9 +137,68 @@ def birdnet_analysis(summaries_root, gen_audio_root, audio_samples=[], num_sampl
             min_conf=0.25
         )
         raw_recording.analyze()
-        save = os.path.join(analysis_root, audio.replace('.wav', ''))
-        os.makedirs(save)
-        with open(os.path.join(save, 'gen.json'), 'w') as f:
-            json.dump(gen_recording.detections, f)
-        with open(os.path.join(save, 'raw.json'), 'w') as f:
-            json.dump(raw_recording.detections, f)
+
+        gen_dict = defaultdict(list)
+        raw_dict = defaultdict(list)
+
+        for det in gen_recording.detections:
+            gen_dict[det['common_name']].append(det)
+
+        for det in raw_recording.detections:
+            raw_dict[det['common_name']].append(det)
+
+        all_species = set(gen_dict.keys()).union(set(raw_dict.keys()))
+
+        for species in all_species:
+            gen_detections = gen_dict.get(species, [])
+            raw_detections = raw_dict.get(species, [])
+
+            for g_det in gen_detections:
+                matched = False
+                for r_det in raw_detections:
+                    if g_det['start_time'] == r_det['start_time'] \
+                            and g_det['end_time'] == r_det['end_time']:
+                        results.append({
+                            'audio_file': audio,
+                            'species': species,
+                            'gen_start_time': g_det['start_time'],
+                            'gen_end_time': g_det['end_time'],
+                            'gen_confidence': g_det['confidence'],
+                            'raw_start_time': r_det['start_time'],
+                            'raw_end_time': r_det['end_time'],
+                            'raw_confidence': r_det['confidence'],
+                            'match': True
+                        })
+                        matched = True
+                        break
+                if not matched:
+                    results.append({
+                        'audio_file': audio,
+                        'species': species,
+                        'gen_start_time': g_det['start_time'],
+                        'gen_end_time': g_det['end_time'],
+                        'gen_confidence': g_det['confidence'],
+                        'raw_start_time': None,
+                        'raw_end_time': None,
+                        'raw_confidence': None,
+                        'match': False
+                    })
+
+            for r_det in raw_detections:
+                if not any(r_det['start_time'] == res['raw_start_time'] and
+                           r_det['end_time'] == res['raw_end_time'] for res in results):
+                    results.append({
+                        'audio_file': audio,
+                        'species': species,
+                        'gen_start_time': None,
+                        'gen_end_time': None,
+                        'gen_confidence': None,
+                        'raw_start_time': r_det['start_time'],
+                        'raw_end_time': r_det['end_time'],
+                        'raw_confidence': r_det['confidence'],
+                        'match': False
+                    })
+
+    df = pd.DataFrame(results)
+    os.makedirs(os.path.join(config.DATASET_ROOT, 'evaluate'), exist_ok=True)
+    df.to_csv(os.path.join(config.DATASET_ROOT, 'evaluate', 'birdnet_analysis.csv'))
