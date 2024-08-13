@@ -1,15 +1,24 @@
 """
-Model utility functions.
+# Utility functions.
 
-- set_device
-- get_files
-- train_val_test_split
-- custom_collate
-- get_test_sample
-- spectrogram_to_audio
-- remove_padding
-- save_tensor_as_img
-- save_figure
+## File Management
+
+- train_val_test_split - Creates a train, val, test split.
+- get_raw_audio - Get full paths to raw audio files from generated audio file names.
+
+## Transformations
+
+- spectrogram_to_audio - Recompose audio using magnitude and phase data.
+- remove_padding_from_tensor - Remove the padding value from a tensor.
+- convert_tensor_to_img - Convert a tensor to a PIL image. Values are normalised to range 0-255.
+- save_tensor_as_img - `convert_tensor_to_img` then save.
+- create_line_graph - Create a simple line graph. Multiple lines can be on one figure.
+
+## Model Utilities
+
+- set_device - Set the device to MPS, CUDA or CPU.
+- train_collate - Set how data is passed from the DataLoader to the model during training.
+- eval_collate - Set how data is passed from the DataLoader to the model during evaluation.
 """
 import gzip
 import json
@@ -22,63 +31,6 @@ import numpy as np
 import soundfile as sf
 import torch
 from PIL import Image
-
-
-def set_device(device: str):
-    """
-    Set the device to MPS, CUDA or CPU.
-
-    Args:
-        mps (bool): Use the GPU, for macOS devices.
-        cuda (bool): Use the GPU, for Windows devices.
-        cpu (bool): Use the CPU.
-
-    Raises:
-        MPSNotAvailable: MPS was chosen but is not available.
-        MPSNotBuilt: MPS was chosen and is available but is not built.
-        CUDANotAvailable: CUDA was chosen but is not available.
-        ValueError: No device was chosen.
-
-    Returns:
-        torch.device: Device for model training and inference.
-    """
-    if device == 'mps':
-        mps_avail = torch.backends.mps.is_available()
-        mps_built = torch.backends.mps.is_built()
-        if not mps_avail:
-            raise MPSNotAvailable('MPS is not available.')
-        if not mps_built:
-            raise MPSNotBuilt('MPS is not built.')
-        if mps_avail and mps_built:
-            return torch.device('mps')
-    elif device == 'cuda':
-        if torch.cuda.is_available():
-            return torch.device('cuda')
-        else:
-            raise CUDANotAvailable('CUDA is not available.')
-    elif device == 'cpu':
-        return torch.device('cpu')
-    else:
-        raise ValueError('Device must be \'mps\', \'cuda\' or \'cpu\'.')
-
-
-def get_files(dataset_path: str, include_correlated: bool):
-    """
-    Gets a list of file paths to each image in the dataset.
-
-    Args:
-        dataset_path (str): Path to dataset root.
-        include_correlated (bool): Include images that have been cross correlated.
-
-    Returns:
-        list: List of full paths to image data.
-    """
-    files = os.listdir(dataset_path)
-    if include_correlated:
-        files.extend(os.listdir(os.path.join(dataset_path, 'correlated')))
-    files = [file for file in files if file.endswith('.png')]
-    files_complete = [os.path.join(dataset_path, file) for file in files]
-    return files_complete
 
 
 def train_val_test_split(data: list, split_percent: float, shuffle=True):
@@ -114,72 +66,44 @@ def train_val_test_split(data: list, split_percent: float, shuffle=True):
     return train, val, test
 
 
-def custom_collate(batch):
+def get_raw_audio(generated_audio, raw_data_root, mic2_name, mic2_delim):
     """
-    Defines how data is passed from the Dataset to the DataLoader.
+    Get full paths to raw audio files from generated audio file names.
 
     Args:
-        batch (list): Batch of data.
-
-    Returns:
-        tuple: Data to be used in the training loop.
+        generated_audio_dir (_type_): _description_
     """
-    input_tensors, target_tensors, original_dimensions, padding_coords, image_path = zip(*batch)
-    return (torch.stack(input_tensors), torch.stack(target_tensors),
-            original_dimensions, padding_coords, image_path)
-
-
-def get_test_sample(dataset_root, raw_data_root, mic2_name, mic2_delim, num_samples):
-    """
-    Get random samples from the test set and return their full image path in the
-    raw data folder and its magnitude and phase parameter dictionary.
-    """
-    samples = [file for file in os.listdir(os.path.join(dataset_root, 'test'))
-               if file.endswith('.png')]
-    if len(samples) == 0:
-        raise Exception('Empty test folder')
-    if len(samples) < num_samples:
-        print(f'{num_samples} samples requested.\n'
-              f'Only {len(samples)} in test set.\n'
-              'Returning all.')
-        num_samples = len(samples)
-
-    random_samples = random.sample(samples, k=num_samples)
-
     audio_paths = []
-    params_paths = []
-
-    for i, sample in enumerate(random_samples):
+    for i, sample in enumerate(generated_audio):
+        # key which is just file basename without ext
+        key = sample.replace('.png', '')
+        # key where basename matches original target mic format
+        audio_key = key.split('_')
+        audio_key[0] = audio_key[0] + mic2_delim
+        audio_key = '_'.join(audio_key)
+        # use data from filename to navigate raw data folder
         loc, date, time = sample.split('_')
-        filename = ''.join([loc + mic2_delim + '_', date + '_', time])
-        filename = filename.replace('.png', '.wav')
         year = date[:4] + '_' + date[4:6]
-        full_path = os.path.join(raw_data_root, year, mic2_name, loc, filename)
-        audio_paths.append(full_path)
-
-        params_path = os.path.join(dataset_root, 'test', 'params')
-        params_paths = os.listdir(params_path)
-
-        print(f'Processed {i + 1}/{len(samples)} samples')
-    return audio_paths, params_paths
+        # save path to audio
+        audio_paths.append(os.path.join(raw_data_root, year, mic2_name, loc, audio_key))
+    return audio_paths
 
 
-def spectrogram_to_audio(spectrogram_path: str, params_path: str, dataset_root: str, output_path: str, sample_rate):
+def spectrogram_to_audio(spectrogram_img: str, params_path: str, file_path: str, sample_rate):
     """
     Recompose audio using magnitude and phase data retained during
     spectrogram creation.
 
     Args:
-        spectrogram_path (str): Path to the spectrogram.
+        spectrogram_img (str): Spectrogram as PIL image.
         output_path (str): Where to save the audio.
         sample_rate (int): Sample rate in Hz.
     """
     # open spectrogram
-    spectrogram_img = Image.open(spectrogram_path)
     spectrogram_arr = np.array(spectrogram_img)
 
     # with open(params_path, 'r') as f:
-    with gzip.open(params_path, 'wt') as f:  # jsons are zipped
+    with gzip.open(params_path, 'rt', encoding='utf-8') as f:  # jsons are zipped
         params = json.load(f)
         magnitude_real = np.array(params['magnitude_real'])
         magnitude_imag = np.array(params['magnitude_imag'])
@@ -203,14 +127,11 @@ def spectrogram_to_audio(spectrogram_path: str, params_path: str, dataset_root: 
                           win_length=params['n_fft'],
                           length=params.get('original_length'))
 
-        # create path
-        file_path = os.path.join(output_path, spectrogram_path.split('/')[2].replace('.png',
-                                                                                     '.wav'))
         # save audio
-        sf.write(file_path, y, sample_rate)
+        sf.write(file_path.replace('.png', '.wav'), y, sample_rate)
 
 
-def remove_padding(tensor, original_dimensions, pad_coords: dict, is_target):
+def remove_padding_from_tensor(tensor, original_dimensions, pad_coords: dict, is_target):
     """
     Remove the padding value from a tensor.
 
@@ -251,13 +172,9 @@ def remove_padding(tensor, original_dimensions, pad_coords: dict, is_target):
             return cropped_tensor
 
 
-def save_tensor_as_img(tensor, save_path):
+def convert_tensor_to_img(tensor):
     """
-    Normalise pixel values to 0-255, convert to a PIL image and save.
-
-    Args:
-        tensor (torch.Tensor): Image.
-        save_path (str): Where to save the image. '.png' is not required.
+    Normalise pixel values to 0-255, convert to a PIL image and return.
     """
     t = tensor.cpu().detach().numpy()  # convert tensor to np array
     # remove dimension values of 1
@@ -273,10 +190,22 @@ def save_tensor_as_img(tensor, save_path):
     img = ((img - img.min()) / (img.max() - img.min()) * 255).astype(np.uint8)
     # convert to PIL image and save
     image = Image.fromarray(img, mode='L')
+    return image
+
+
+def save_tensor_as_img(tensor, save_path):
+    """
+    Normalise pixel values to 0-255, convert to a PIL image and save.
+
+    Args:
+        tensor (torch.Tensor): Image.
+        save_path (str): Where to save the image. '.png' is not required.
+    """
+    image = convert_tensor_to_img(tensor)
     image.save(save_path, format='png')
 
 
-def save_figure(*data, title, xlabel, ylabel, save_path):
+def create_line_graph(*data, title, xlabel, ylabel, save_path):
     """
     Saves data on a matplotlib line graph. Accepts a variable number of data
     to plot enabling lines on the same graph.
@@ -293,6 +222,66 @@ def save_figure(*data, title, xlabel, ylabel, save_path):
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.savefig(save_path)
+
+
+def set_device(device: str):
+    """
+    Set the device to MPS, CUDA or CPU.
+
+    Args:
+        mps (bool): Use the GPU, for macOS devices.
+        cuda (bool): Use the GPU, for Windows devices.
+        cpu (bool): Use the CPU.
+
+    Raises:
+        MPSNotAvailable: MPS was chosen but is not available.
+        MPSNotBuilt: MPS was chosen and is available but is not built.
+        CUDANotAvailable: CUDA was chosen but is not available.
+        ValueError: No device was chosen.
+
+    Returns:
+        torch.device: Device for model training and inference.
+    """
+    if device == 'mps':
+        mps_avail = torch.backends.mps.is_available()
+        mps_built = torch.backends.mps.is_built()
+        if not mps_avail:
+            raise MPSNotAvailable('MPS is not available.')
+        if not mps_built:
+            raise MPSNotBuilt('MPS is not built.')
+        if mps_avail and mps_built:
+            return torch.device('mps')
+    elif device == 'cuda':
+        if torch.cuda.is_available():
+            return torch.device('cuda')
+        else:
+            raise CUDANotAvailable('CUDA is not available.')
+    elif device == 'cpu':
+        return torch.device('cpu')
+    else:
+        raise ValueError('Device must be \'mps\', \'cuda\' or \'cpu\'.')
+
+
+def train_collate(batch):
+    """
+    Defines how data is passed from the Dataset to the DataLoader.
+
+    Args:
+        batch (list): Batch of data.
+
+    Returns:
+        tuple: Data to be used in the training loop.
+    """
+    input_tensors, target_tensors, original_dimensions, padding_coords, image_path = zip(*batch)
+    return (torch.stack(input_tensors), torch.stack(target_tensors),
+            original_dimensions, padding_coords, image_path)
+
+
+def eval_collate(batch):
+    (input_tensors, target_tensors, original_dimensions,
+     padding_coords, image_path, params_path, audio_path) = zip(*batch)
+    return (torch.stack(input_tensors), torch.stack(target_tensors),
+            original_dimensions, padding_coords, image_path, params_path, audio_path)
 
 
 class MPSNotAvailable(Exception):

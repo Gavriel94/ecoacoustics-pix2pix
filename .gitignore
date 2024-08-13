@@ -12,3 +12,4 @@ pix2pix/evaluation
 raw_data_test
 raw_data_copy/*
 data_test/
+Acoustic_Indices/

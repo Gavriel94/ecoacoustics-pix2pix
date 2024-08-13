@@ -545,7 +545,7 @@ def create_spectrogram(wav_file: str, n_fft: int,
             params_file_name = wav_file.split('/')[4].replace('.wav', '.json.gz')
             file_path_params = os.path.join(params_path, params_file_name)
             # zip JSONs as they're quite large (170MB+)
-            with gzip.open(file_path_params, 'wt', encoding='UTF-8') as f:
+            with gzip.open(file_path_params, 'wt', encoding='utf-8') as f:
                 json.dump(params, f)
             if verbose:
                 print(f'Saved {set_type} set {file_path_params}')
