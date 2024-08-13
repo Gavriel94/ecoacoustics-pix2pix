@@ -6,7 +6,7 @@ import os
 import json
 from tqdm import tqdm
 import config
-from . import utilities as utils
+from .. import utilities as utils
 
 import torch
 from torchmetrics.image import (PeakSignalNoiseRatio,
@@ -59,12 +59,13 @@ def test_model(dataloader, generator, device, save_dir, run_num):
 
                 # convert generated tensor to image
                 gen_img = utils.convert_tensor_to_img(gen_cropped)
-                img_save_path = os.path.join(img_dir, f'b{idx}i{batch_idx}_g_{img_names[batch_idx]}')
+                img_save_path = os.path.join(img_dir,
+                                             f'b{idx}i{batch_idx}_g_{img_names[batch_idx]}')
                 # save using PIL and keep generated img in memory
                 gen_img.save(img_save_path)
 
                 # create audio from spectrograms and save
-                audio_dir = os.path.join(eval_dir, 'audio')
+                audio_dir = os.path.join(eval_dir, 'generated audio')
                 os.makedirs(audio_dir, exist_ok=True)
                 save_path = os.path.join(audio_dir, img_names[batch_idx])  # filename has .png ext
                 try:
