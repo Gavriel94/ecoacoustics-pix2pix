@@ -76,7 +76,8 @@ class Pix2PixTrainDataset(Dataset):
         Applying padding to an image to get it at target width and height.
 
         Padding is applied in blocks to each side. The original image remains
-        unchanged inside the padding.
+        unchanged inside the padding. The original image is a composition of the
+        input and target data, with input on the left and target on the right.
 
            +----------------+
            |      Top       |

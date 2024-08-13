@@ -1,5 +1,5 @@
 """
-Custom L1 loss that ignores a padding value while computing a loss value.
+Custom L1 loss that ignores padding and considers pixel intensity while computing loss.
 """
 
 import torch

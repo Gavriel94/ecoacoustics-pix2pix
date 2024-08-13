@@ -125,19 +125,26 @@ def train_cGAN(discriminator, generator,
                     img_name = img_names[batch_idx]
 
                     # crop and save input image
-                    input_cropped = ut.remove_padding(input_img[batch_idx], original_size,
-                                                      padding_coords, is_target=False)
+                    input_cropped = ut.remove_padding_from_tensor(input_img[batch_idx],
+                                                                  original_size,
+                                                                  padding_coords,
+                                                                  is_target=False)
                     input_path = os.path.join(run_name, f'e{epoch}_b{idx}_i_{img_name}')
                     ut.save_tensor_as_img(input_cropped, input_path)
 
                     # crop and save target image
-                    target_cropped = ut.remove_padding(target_img[batch_idx], original_size,
-                                                       padding_coords, is_target=True)
+                    target_cropped = ut.remove_padding_from_tensor(target_img[batch_idx],
+                                                                   original_size,
+                                                                   padding_coords,
+                                                                   is_target=True)
                     target_path = os.path.join(run_name, f'e{epoch}_b{idx}_t_{img_name}')
                     ut.save_tensor_as_img(target_cropped, target_path)
 
-                    generated_cropped = ut.remove_padding(generated_img[batch_idx], original_size,
-                                                          padding_coords, is_target=False)
+                    # crop and save generated image
+                    generated_cropped = ut.remove_padding_from_tensor(generated_img[batch_idx],
+                                                                      original_size,
+                                                                      padding_coords,
+                                                                      is_target=False)
                     generated_path = os.path.join(run_name, f'e{epoch}_b{idx}_g_{img_name}')
                     ut.save_tensor_as_img(generated_cropped, generated_path)
 
@@ -159,10 +166,14 @@ def train_cGAN(discriminator, generator,
                 for batch_idx in range(val_input.size(0)):
                     dl = f'e{epoch}_b{batch_idx}'  # file ID
                     # crop images
-                    val_target_cropped = ut.remove_padding(val_target[batch_idx], val_size,
-                                                           val_padding_coords, is_target=True)
-                    val_gen_cropped = ut.remove_padding(val_generated[batch_idx], val_size,
-                                                        val_padding_coords, is_target=False)
+                    val_target_cropped = ut.remove_padding_from_tensor(val_target[batch_idx],
+                                                                       val_size,
+                                                                       val_padding_coords,
+                                                                       is_target=True)
+                    val_gen_cropped = ut.remove_padding_from_tensor(val_generated[batch_idx],
+                                                                    val_size,
+                                                                    val_padding_coords,
+                                                                    is_target=False)
 
                     val_psnr += psnr(val_gen_cropped.unsqueeze(0), val_target_cropped.unsqueeze(0))
                     val_ssim += ssim(val_gen_cropped.unsqueeze(0), val_target_cropped.unsqueeze(0))
@@ -231,21 +242,21 @@ def train_cGAN(discriminator, generator,
     # plot and save L1 loss
     l1_path = os.path.join(metrics_path, 'l1_loss')
     ut.save_figure(metrics['custom_loss_losses'],
-                   title='L1 Loss',
+                   title='Combined L1/Intensity Awareness Loss',
                    xlabel='Epoch',
                    ylabel='Loss',
                    save_path=l1_path)
 
     psnr_path = os.path.join(metrics_path, 'psnr')
     ut.save_figure(metrics['avg_psnrs'],
-                   title='Validation PSNR',
+                   title='Average PSNR (validation data)',
                    xlabel='Epoch',
                    ylabel='PSNR',
                    save_path=psnr_path)
 
     ssim_path = os.path.join(metrics_path, 'ssim')
     ut.save_figure(metrics['avg_ssims'],
-                   title='Validation SSIM',
+                   title='Average SSIM (validation data)',
                    xlabel='Epoch',
                    ylabel='SSIM',
                    save_path=ssim_path)

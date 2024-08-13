@@ -3,7 +3,8 @@ Dataset implementation that separates the input and target image from
 the same canvas, and pads to a size compatible with the upsampling
 and downsampling done by the model.
 
-Provides links for the parameter dictionary and raw audio.
+This dataset also retrieves the parameter dictionary and raw audio for each
+test set sample.
 """
 
 import math
@@ -86,7 +87,8 @@ class Pix2PixEvalDataset(Dataset):
         Applying padding to an image to get it at target width and height.
 
         Padding is applied in blocks to each side. The original image remains
-        unchanged inside the padding.
+        unchanged inside the padding. The original image is a composition of the
+        input and target data, with input on the left and target on the right.
 
            +----------------+
            |      Top       |
