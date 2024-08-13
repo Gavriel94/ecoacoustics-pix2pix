@@ -19,7 +19,7 @@ from pix2pix.discriminator import Discriminator
 from pix2pix.generator import Generator
 from pix2pix.l1_intensity_loss import Pix2PixL1IntensityLoss
 from pix2pix.train_cGAN import train_cGAN
-import pix2pix.utilities as utils
+import utilities as utils
 import config
 import os
 
