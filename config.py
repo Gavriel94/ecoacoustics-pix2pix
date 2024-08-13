@@ -2,7 +2,7 @@
 Define cGAN hyperparameters, raw data and dataset paths.
 """
 
-import pix2pix.utilities as utils
+import utilities as utils
 
 DATASET_ROOT = 'data_test/'
 RAW_DATA_ROOT = 'raw_data_test/'
