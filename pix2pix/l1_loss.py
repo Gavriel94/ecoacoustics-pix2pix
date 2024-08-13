@@ -1,5 +1,5 @@
 """
-Custom L1 loss that ignores padding and considers pixel intensity while computing loss.
+Custom L1 loss that ignores padding.
 """
 
 import torch
@@ -7,22 +7,18 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class Pix2PixLoss(nn.Module):
+class Pix2PixL1Loss(nn.Module):
     """
-    Custom L1 loss that ignores padding and incorporates intensity awareness.
+    Custom L1 loss that ignores a padding value.
 
-    Calculates a combination of L1 loss and intensity-based loss between
-    input and target tensors, ignoring areas where the input matches the padding value.
     It handles size mismatches by interpolating the target to match the input size.
 
     Args:
         padding_value (int): Value to ignore when computing loss.
-        alpha (float, optional): Intensity awareness weight when combining loss. Default is 0.5.
     """
-    def __init__(self, padding_value=1.0, alpha=0.5):
-        super(Pix2PixLoss, self).__init__()
+    def __init__(self, padding_value=1.0):
+        super(Pix2PixL1Loss, self).__init__()
         self.padding_value = padding_value  # value to ignore
-        self.alpha = alpha  # weight for intensity loss
 
     def forward(self, input, target):
         """
@@ -45,20 +41,7 @@ class Pix2PixLoss(nn.Module):
         # compute L1 loss
         l1_loss = nn.L1Loss(reduction='none')(input, target)
         masked_l1_loss = l1_loss * mask
-        l1_loss_value = masked_l1_loss.sum() / mask.sum()
-
-        # compute intensity loss
-        input_intensity = (torch.mean(input * mask, dim=[1, 2, 3])
-                           / torch.mean(mask, dim=[1, 2, 3]))
-
-        target_intensity = (torch.mean(target * mask, dim=[1, 2, 3])
-                            / torch.mean(mask, dim=[1, 2, 3]))
-
-        intensity_loss = F.mse_loss(input_intensity, target_intensity)
-
-        # combine losses
-        total_loss = (1 - self.alpha) * l1_loss_value + self.alpha * intensity_loss
-        return total_loss
+        return masked_l1_loss.sum() / mask.sum()
 
     def test_custom_l1_loss(self):
         """

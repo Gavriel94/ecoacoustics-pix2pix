@@ -17,7 +17,7 @@ from torch.utils.data import DataLoader
 from pix2pix.dataset_train import Pix2PixTrainDataset
 from pix2pix.discriminator import Discriminator
 from pix2pix.generator import Generator
-from pix2pix.custom_loss import Pix2PixLoss
+from pix2pix.l1_intensity_loss import Pix2PixL1IntensityLoss
 from pix2pix.train_cGAN import train_cGAN
 import pix2pix.utilities as utils
 import config
@@ -48,7 +48,7 @@ def main():
     optim_disc = optim.Adam(disc.parameters(), lr=config.LEARNING_RATE, betas=(0.5, 0.999))
     optim_gen = optim.Adam(gen.parameters(), lr=config.LEARNING_RATE, betas=(0.5, 0.999))
     bce = nn.BCEWithLogitsLoss()
-    l1_loss = Pix2PixLoss(alpha=0.8)
+    l1_loss = Pix2PixL1IntensityLoss(alpha=0.8)
 
     train_cGAN(disc, gen, train_loader, val_loader,
                optim_disc, optim_gen, l1_loss, config.L1_LAMBDA,
