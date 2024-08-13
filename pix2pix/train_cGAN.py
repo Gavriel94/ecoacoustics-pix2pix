@@ -19,7 +19,7 @@ def train_cGAN(discriminator, generator,
                custom_loss, loss_lambda,
                bce_logits, num_epochs,
                device, save_dir: str,
-               accumulation_steps, save_images: int = 5):
+               accumulation_steps):
     """
     Train the conditional Generative Adverserial Network (cGAN).
 
@@ -48,7 +48,6 @@ def train_cGAN(discriminator, generator,
         device (torch.device): Device for tensor operations.
         save_dir (str): Output for evaluation data.
         accumulation_steps (int): Steps before updating gradients. Simulates batching.
-        view_val_epoch (int, optional): View attempts on validation data. Defaults to 5.
     """
     runs_dir = os.path.join(save_dir, 'runs')
     os.makedirs(runs_dir, exist_ok=True)
@@ -119,8 +118,8 @@ def train_cGAN(discriminator, generator,
                 optim_discriminator.zero_grad()
                 optim_generator.zero_grad()
 
-            # save image at batch for inspection
-            if idx == save_images:
+            # just save images from the first batch
+            if idx == 0:
                 batch_size = input_img.size(0)
                 for batch_idx in range(batch_size):
                     img_name = img_names[batch_idx]
@@ -129,8 +128,6 @@ def train_cGAN(discriminator, generator,
                     input_cropped = ut.remove_padding(input_img[batch_idx], original_size,
                                                       padding_coords, is_target=False)
                     input_path = os.path.join(run_name, f'e{epoch}_b{idx}_i_{img_name}')
-                    print(input_path)
-                    print(type(input_cropped))
                     ut.save_tensor_as_img(input_cropped, input_path)
 
                     # crop and save target image
@@ -152,38 +149,32 @@ def train_cGAN(discriminator, generator,
 
         with torch.no_grad():
             # get a batch of validation data
+            val_dir = os.path.join(run_name, 'validation')
+            os.makedirs(val_dir, exist_ok=True)
             for val_idx, (val_input, val_target,
                           val_size, val_padding_coords, val_name) in enumerate(validation_loader):
                 val_input, val_target = val_input.to(device), val_target.to(device)
                 val_generated = generator(val_input)
 
-                # get psnr and ssim by comparing generated and target images
-                val_psnr += psnr(val_generated, val_target)
-                val_ssim += ssim(val_generated, val_target)
+                for batch_idx in range(val_input.size(0)):
+                    dl = f'e{epoch}_b{batch_idx}'  # file ID
+                    # crop images
+                    val_target_cropped = ut.remove_padding(val_target[batch_idx], val_size,
+                                                           val_padding_coords, is_target=True)
+                    val_gen_cropped = ut.remove_padding(val_generated[batch_idx], val_size,
+                                                        val_padding_coords, is_target=False)
+
+                    val_psnr += psnr(val_gen_cropped.unsqueeze(0), val_target_cropped.unsqueeze(0))
+                    val_ssim += ssim(val_gen_cropped.unsqueeze(0), val_target_cropped.unsqueeze(0))
+
+                if val_idx == 0:
+                    # just save images from the first batch
+                    val_target_path = os.path.join(val_dir, f'{dl}_t_{str(val_name[batch_idx])}')
+                    ut.save_tensor_as_img(val_target_cropped, val_target_path)
+
+                    val_gen_path = os.path.join(val_dir, f'{dl}_g_{str(val_name[batch_idx])}')
+                    ut.save_tensor_as_img(val_gen_cropped, val_gen_path)
                 num_val_batches += 1
-
-            val_dir = os.path.join(run_name, 'validation')
-            os.makedirs(val_dir, exist_ok=True)
-            for batch_idx in range(min(3, val_input.size(0))):
-                dl = f'e{epoch}_b{batch_idx}'  # file ID
-
-                # uncomment to save input images as well
-                # val_input_cropped = ut.remove_padding(val_input[batch_idx], val_size,
-                #                                       val_padding_coords, is_target=False)
-                # val_input_path = os.path.join(val_dir, f'{dl}_i_{str(val_name[batch_idx])}')
-                # ut.save_tensor_as_img(val_input_cropped, val_input_path)
-
-                # crop and save target validation image
-                val_target_cropped = ut.remove_padding(val_target[batch_idx], val_size,
-                                                       val_padding_coords, is_target=True)
-                val_target_path = os.path.join(val_dir, f'{dl}_t_{str(val_name[batch_idx])}')
-                ut.save_tensor_as_img(val_target_cropped, val_target_path)
-
-                # crop and save generated validation image
-                val_gen_cropped = ut.remove_padding(val_generated[batch_idx], val_size,
-                                                    val_padding_coords, is_target=False)
-                val_gen_path = os.path.join(val_dir, f'{dl}_g_{str(val_name[batch_idx])}')
-                ut.save_tensor_as_img(val_gen_cropped, val_gen_path)
 
         # store average psnr and ssim
         avg_val_psnr = val_psnr / num_val_batches
@@ -201,6 +192,12 @@ def train_cGAN(discriminator, generator,
             optim_generator.step()
             optim_discriminator.zero_grad()
             optim_generator.zero_grad()
+
+    # save the model
+    model_save_path = os.path.join(run_name, 'model')
+    os.makedirs(model_save_path, exist_ok=True)
+    torch.save(generator.state_dict(), os.path.join(model_save_path, 'generator.pth'))
+    torch.save(discriminator.state_dict(), os.path.join(model_save_path, 'discriminator.pth'))
 
     # make directory for metrics captured during training
     metrics_path = os.path.join(run_name, 'metrics')
