@@ -14,6 +14,10 @@ class Pix2PixLoss(nn.Module):
     Calculates a combination of L1 loss and intensity-based loss between
     input and target tensors, ignoring areas where the input matches the padding value.
     It handles size mismatches by interpolating the target to match the input size.
+
+    Args:
+        padding_value (int): Value to ignore when computing loss.
+        alpha (float, optional): Intensity awareness weight when combining loss. Default is 0.5.
     """
     def __init__(self, padding_value=1.0, alpha=0.5):
         super(Pix2PixLoss, self).__init__()
