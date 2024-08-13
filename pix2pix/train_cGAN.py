@@ -10,7 +10,7 @@ from torchmetrics.image import (PeakSignalNoiseRatio,
                                 StructuralSimilarityIndexMeasure)
 from tqdm import tqdm
 
-from .. import utilities as utils
+from . import model_utils as utils
 
 
 def train_cGAN(discriminator, generator,
@@ -63,7 +63,7 @@ def train_cGAN(discriminator, generator,
         'avg_ssims': []
     }
 
-    psnr = PeakSignalNoiseRatio().to(device)
+    psnr = PeakSignalNoiseRatio(data_range=1.0).to(device)
     ssim = StructuralSimilarityIndexMeasure().to(device)
 
     print(f'Run {run_num}')
