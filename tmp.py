@@ -4,6 +4,9 @@ import pandas as pd
 import utilities as utils
 from datetime import datetime
 import random
+from birdnetlib import Recording
+from birdnetlib.analyzer import Analyzer
+import json
 
 
 def format_datetime(date_str):
@@ -17,7 +20,7 @@ def format_datetime(date_str):
         print(f'File name incorrectly formatted: {date_str}')
 
 
-def match_audio_summary(summaries_root, audio_root, save: bool):
+def match_audio_summary(summaries_root, audio_root):
     """
     Uses the audios filename to search through all summary file and
     return its specific row of values.
@@ -60,58 +63,77 @@ def match_audio_summary(summaries_root, audio_root, save: bool):
 
     # combine list of single-row DataFrames into one df
     combined_rows = pd.concat(rows, ignore_index=True)
-    if save:
-        combined_rows.to_csv(os.path.join(summaries_root, 'audio_matched.csv'))
     return combined_rows
 
 
-def bird_net_analysis(audio):
-    
+def birdnet_analysis(summaries_root, gen_audio_root, audio_samples=[], num_samples=5):
+    """
+    Pair and run generated and raw recordings through BirdNet.
+    Produces JSON files for inspection.
 
+    Args:
+        summaries_root (_type_): _description_
+        gen_audio_root (_type_): _description_
+        num_samples (_type_): _description_
 
-def main():
-    # ensure no metadata files exist
-    utils.remove_hidden_files(config.RAW_DATA_ROOT)
-    utils.remove_hidden_files(config.DATASET_ROOT)
+    Raises:
+        ValueError: _description_
+    """
+    if num_samples <= 0:
+        raise ValueError('Must analyse at least 1 sample.')
+    # generates a df of summary data for all audio files
+    audio_df = match_audio_summary(summaries_root, gen_audio_root, save=True)
 
-    # list of full summaries
-    summaries_root = os.path.join(config.RAW_DATA_ROOT, 'full_summaries')
-    # audio generated from test data
-    gen_audio_root = os.path.join(config.DATASET_ROOT, 'evaluate', 'audio')
+    if len(audio_samples) == 0:
+        audio_samples = random.sample(os.listdir(gen_audio_root), num_samples)
+    months = {
+        'Jan': '01',
+        'Feb': '02',
+        'Mar': '03',
+        'Apr': '04',
+        'May': '05',
+        'Jun': '06',
+        'Jul': '07',
+        'Aug': '08',
+        'Sep': '09',
+        'Oct': '10',
+        'Nov': '11',
+        'Dec': '12'
+    }
+    analysis_root = os.path.join(config.DATASET_ROOT, 'evaluate', 'birdnet_results')
+    os.makedirs(analysis_root, exist_ok=True)
+    analyzer = Analyzer()
+    for audio in audio_samples:
+        raw_audio = utils.get_raw_audio(audio, config.RAW_DATA_ROOT, 'SM4', '-4')
+        date, time = utils.filename_to_datetime(audio)
+        year, month, day = date.split('-')
+        month = months[month]
+        # get recordings latitude and longitude from summary file
+        lat_lon = audio_df[(audio_df['DATE'] == date)
+                           & (audio_df['TIME'] == time)][['LAT', 'LON']].iloc[0]
 
-    audio_matched_path = os.path.join(summaries_root, 'audio_matched.csv')
-    if not os.path.exists(audio_matched_path):
-        # generates a df of summary data for all audio files
-        audio_df = match_audio_summary(summaries_root, gen_audio_root, save=True)
-    else:
-        audio_df = pd.read_csv(audio_matched_path)
+        gen_recording = Recording(
+            analyzer,
+            os.path.join(gen_audio_root, audio),
+            lat_lon['LAT'],
+            lon=lat_lon['LON'],
+            date=datetime(year=int(year), month=int(month), day=int(day)),
+            min_conf=0.25
+        )
+        gen_recording.analyze()
 
-    # get a random generated audio
-    generated_audio = random.choice(os.listdir(gen_audio_root))
-    raw_audio = utils.get_raw_audio(generated_audio, config.RAW_DATA_ROOT, 'SM4', '-4')
-
-    date, time = utils.filename_to_datetime(generated_audio)
-    # get recordings latitude and longitude from summary file
-    lat_lon = audio_df[(audio_df['DATE'] == date)
-                       & (audio_df['TIME'] == time)][['LAT', 'LON']].iloc[0]
-
-    print(generated_audio, raw_audio)
-
-
-    # bird_net_analysis()
-
-
-
-
-
-
-
-
-    # bird_net_analysis(summaries, test_files)
-    # print(data['LAT'])
-    # lat = data['LAT'].item()
-    # lon = data['LAT'].item()
-    # print(lat, lon)
-
-if __name__ == '__main__':
-    main()
+        raw_recording = Recording(
+            analyzer,
+            raw_audio,
+            lat_lon['LAT'],
+            lon=lat_lon['LON'],
+            date=datetime(year=int(year), month=int(month), day=int(day)),
+            min_conf=0.25
+        )
+        raw_recording.analyze()
+        save = os.path.join(analysis_root, audio.replace('.wav', ''))
+        os.makedirs(save)
+        with open(os.path.join(save, 'gen.json'), 'w') as f:
+            json.dump(gen_recording.detections, f)
+        with open(os.path.join(save, 'raw.json'), 'w') as f:
+            json.dump(raw_recording.detections, f)
