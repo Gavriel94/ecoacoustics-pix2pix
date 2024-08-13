@@ -1,5 +1,5 @@
 """
-# Utility functions.
+# Utility functions
 
 ## File Management
 
