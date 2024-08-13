@@ -2,12 +2,12 @@
 Define cGAN hyperparameters, raw data and dataset paths.
 """
 
-import utilities as utils
+from pix2pix.model_utils import set_device
 
 DATASET_ROOT = 'data_test/'
 RAW_DATA_ROOT = 'raw_data_test/'
 
-DEVICE = utils.set_device('mps')
+DEVICE = set_device('mps')
 
 LEARNING_RATE = 2e-4
 BATCH_SIZE = 1

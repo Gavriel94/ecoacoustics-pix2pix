@@ -6,7 +6,7 @@ import os
 import json
 from tqdm import tqdm
 import config
-from .. import utilities as utils
+from . import model_utils as utils
 
 import torch
 from torchmetrics.image import (PeakSignalNoiseRatio,
@@ -17,7 +17,7 @@ def test_model(dataloader, generator, device, save_dir, run_num):
     eval_dir = os.path.join(save_dir, 'evaluate')
     os.makedirs(eval_dir, exist_ok=True)
 
-    psnr = PeakSignalNoiseRatio().to(config.DEVICE)
+    psnr = PeakSignalNoiseRatio(data_range=1.0).to(config.DEVICE)
     ssim = StructuralSimilarityIndexMeasure().to(config.DEVICE)
 
     metrics = {
@@ -74,25 +74,28 @@ def test_model(dataloader, generator, device, save_dir, run_num):
                     print(f'Error opening {param_dicts[batch_idx]}, {str(e)}')
             num_batches += 1
 
-        avg_psnr = avg_psnr / num_batches
-        avg_ssim = avg_ssim / num_batches
-        metrics['avg_psnrs'].append(avg_psnr.item())
-        metrics['avg_ssims'].append(avg_ssim.item())
+            avg_psnr = avg_psnr / num_batches
+            avg_ssim = avg_ssim / num_batches
+            metrics['avg_psnrs'].append(avg_psnr.item())
+            metrics['avg_ssims'].append(avg_ssim.item())
 
-        graph_dir = os.path.join(eval_dir, 'metrics')
+        print('metrics[\'avg_psnrs\']', metrics['avg_psnrs'])
+        print('metrics[\'avg_ssims\']', metrics['avg_ssims'])
+
+        graph_dir = os.path.join(eval_dir, 'graphs')
         os.makedirs(graph_dir, exist_ok=True)
 
         psnr_path = os.path.join(graph_dir, 'psnr')
         utils.create_line_graph(metrics['avg_psnrs'],
                                 title='Average PSNR',
-                                xlabel='Epoch',
+                                xlabel='Batch',
                                 ylabel='PSNR',
                                 save_path=psnr_path)
 
         ssim_path = os.path.join(graph_dir, 'ssim')
         utils.create_line_graph(metrics['avg_ssims'],
                                 title='Average SSIM',
-                                xlabel='Epoch',
+                                xlabel='Batch',
                                 ylabel='SSIM',
                                 save_path=ssim_path)
     return metrics
