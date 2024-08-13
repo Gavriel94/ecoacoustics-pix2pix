@@ -10,7 +10,7 @@ from torchmetrics.image import (PeakSignalNoiseRatio,
                                 StructuralSimilarityIndexMeasure)
 from tqdm import tqdm
 
-from . import utilities as utils
+from .. import utilities as utils
 
 
 def train_cGAN(discriminator, generator,
