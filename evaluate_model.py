@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 
 import config
 from Acoustic_Indices.main_compute_indices_from_dir import compute_indices
-from pix2pix import utilities as utils
+import utilities as utils
 from pix2pix.dataset_eval import Pix2PixEvalDataset
 from pix2pix.generator import Generator
 from pix2pix.test_cGAN import test_model
