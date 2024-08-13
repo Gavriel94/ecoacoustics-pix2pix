@@ -70,27 +70,8 @@ from scipy.signal import correlate2d
 from tqdm import tqdm
 
 import config
-import pix2pix.utilities as utils
+import utilities as utils
 from audio_analysis import analyse_recordings
-
-
-def remove_hidden_files(data: str):
-    """
-    Removes directory metadata files that Windows or macOS generate.
-
-    Args:
-        data (str): Path to folder.
-    """
-    remove_files = ['.DS_Store', 'desktop.ini', 'Thumbs.db']
-    for root, dirs, files in os.walk(data):
-        for file in files:
-            if file in remove_files:
-                file_path = os.path.join(root, file)
-                try:
-                    os.remove(file_path)
-                except Exception as e:
-                    print(f'Error removing {file_path}: {e}.\n'
-                          'Try removing manually.')
 
 
 def create_data_dict(raw_data_root: str, dataset_root: str, validate_summaries: bool):
@@ -179,7 +160,7 @@ def create_summary_file(dir_path: str):
             first_date = strip_underscore()
         elif i == len(files) - 1:
             last_date = strip_underscore()
-        out_date, out_time = translate_datetime(file)
+        out_date, out_time = utils.filename_to_datetime(file)
         datetime_dict['DATE'].append(out_date)
         datetime_dict['TIME'].append(out_time)
     df = pd.DataFrame(datetime_dict)
@@ -194,8 +175,6 @@ def create_summary_file(dir_path: str):
     print(f'Summary file generated\nSaved in {file_path}\n')
     df.to_csv(file_path, index=False)
 
-
-def translate_datetime(file_name: str):
     """
     Translates datetime from filenames into a string format.
 
@@ -354,7 +333,7 @@ def link_recordings(data_dict: dict,
                 wav_files = wav_files[:file_limit]
 
             for i, file in enumerate(wav_files):
-                date, time = translate_datetime(file)
+                date, time = utils.filename_to_datetime(file)
                 for _, row in dt_df.iterrows():
                     if row['DATE'] == date and row['TIME'] == time:
                         try:
@@ -599,7 +578,7 @@ def main():
 
     # remove hidden files from macOS or Windows systems
     if platform.system() == 'Darwin' or platform.system() == 'Windows':
-        remove_hidden_files(raw_data)
+        utils.remove_hidden_files(raw_data)
 
     # create a directory to store the dataset in
     os.makedirs(data, exist_ok=True)
