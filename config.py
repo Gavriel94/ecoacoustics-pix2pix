@@ -14,7 +14,6 @@ BATCH_SIZE = 1
 NUM_WORKERS = 0
 NUM_EPOCHS = 2
 L1_LAMBDA = 200  # how much weight is given to the combined L1/Intensity loss
-DISPLAY_EPOCH = 2  # epoch where progress information is displayed
 
 # number of steps gradients accumulate before updating weights
-ACCUMULATION_STEPS = 4  # (emulated batch size == ACCUMULATION_STEPS * BATCH_SIZE)
+ACCUMULATION_STEPS = 4  # emulates batch of size (ACCUMULATION_STEPS * BATCH_SIZE)
