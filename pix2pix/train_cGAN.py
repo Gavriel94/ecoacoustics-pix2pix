@@ -10,7 +10,7 @@ from torchmetrics.image import (PeakSignalNoiseRatio,
                                 StructuralSimilarityIndexMeasure)
 from tqdm import tqdm
 
-from . import utilities as ut
+from . import utilities as utils
 
 
 def train_cGAN(discriminator, generator,
@@ -125,28 +125,28 @@ def train_cGAN(discriminator, generator,
                     img_name = img_names[batch_idx]
 
                     # crop and save input image
-                    input_cropped = ut.remove_padding_from_tensor(input_img[batch_idx],
-                                                                  original_size,
-                                                                  padding_coords,
-                                                                  is_target=False)
+                    input_cropped = utils.remove_padding_from_tensor(input_img[batch_idx],
+                                                                     original_size,
+                                                                     padding_coords,
+                                                                     is_target=False)
                     input_path = os.path.join(run_name, f'e{epoch}_b{idx}_i_{img_name}')
-                    ut.save_tensor_as_img(input_cropped, input_path)
+                    utils.save_tensor_as_img(input_cropped, input_path)
 
                     # crop and save target image
-                    target_cropped = ut.remove_padding_from_tensor(target_img[batch_idx],
-                                                                   original_size,
-                                                                   padding_coords,
-                                                                   is_target=True)
-                    target_path = os.path.join(run_name, f'e{epoch}_b{idx}_t_{img_name}')
-                    ut.save_tensor_as_img(target_cropped, target_path)
-
-                    # crop and save generated image
-                    generated_cropped = ut.remove_padding_from_tensor(generated_img[batch_idx],
+                    target_cropped = utils.remove_padding_from_tensor(target_img[batch_idx],
                                                                       original_size,
                                                                       padding_coords,
-                                                                      is_target=False)
+                                                                      is_target=True)
+                    target_path = os.path.join(run_name, f'e{epoch}_b{idx}_t_{img_name}')
+                    utils.save_tensor_as_img(target_cropped, target_path)
+
+                    # crop and save generated image
+                    generated_cropped = utils.remove_padding_from_tensor(generated_img[batch_idx],
+                                                                         original_size,
+                                                                         padding_coords,
+                                                                         is_target=False)
                     generated_path = os.path.join(run_name, f'e{epoch}_b{idx}_g_{img_name}')
-                    ut.save_tensor_as_img(generated_cropped, generated_path)
+                    utils.save_tensor_as_img(generated_cropped, generated_path)
 
         # validation step
         generator.eval()
@@ -166,14 +166,14 @@ def train_cGAN(discriminator, generator,
                 for batch_idx in range(val_input.size(0)):
                     dl = f'e{epoch}_b{batch_idx}'  # file ID
                     # crop images
-                    val_target_cropped = ut.remove_padding_from_tensor(val_target[batch_idx],
+                    val_target_cropped = utils.remove_padding_from_tensor(val_target[batch_idx],
+                                                                          val_size,
+                                                                          val_padding_coords,
+                                                                          is_target=True)
+                    val_gen_cropped = utils.remove_padding_from_tensor(val_generated[batch_idx],
                                                                        val_size,
                                                                        val_padding_coords,
-                                                                       is_target=True)
-                    val_gen_cropped = ut.remove_padding_from_tensor(val_generated[batch_idx],
-                                                                    val_size,
-                                                                    val_padding_coords,
-                                                                    is_target=False)
+                                                                       is_target=False)
 
                     val_psnr += psnr(val_gen_cropped.unsqueeze(0), val_target_cropped.unsqueeze(0))
                     val_ssim += ssim(val_gen_cropped.unsqueeze(0), val_target_cropped.unsqueeze(0))
@@ -181,10 +181,10 @@ def train_cGAN(discriminator, generator,
                 if val_idx == 0:
                     # just save images from the first batch
                     val_target_path = os.path.join(val_dir, f'{dl}_t_{str(val_name[batch_idx])}')
-                    ut.save_tensor_as_img(val_target_cropped, val_target_path)
+                    utils.save_tensor_as_img(val_target_cropped, val_target_path)
 
                     val_gen_path = os.path.join(val_dir, f'{dl}_g_{str(val_name[batch_idx])}')
-                    ut.save_tensor_as_img(val_gen_cropped, val_gen_path)
+                    utils.save_tensor_as_img(val_gen_cropped, val_gen_path)
                 num_val_batches += 1
 
         # store average psnr and ssim
@@ -216,50 +216,50 @@ def train_cGAN(discriminator, generator,
 
     # plot and save discriminator loss
     disc_path = os.path.join(metrics_path, 'disc_loss')
-    ut.save_figure(metrics['disc_losses'],
-                   title='Discriminator Loss',
-                   xlabel='Epoch',
-                   ylabel='Loss',
-                   save_path=disc_path)
+    utils.create_line_graph(metrics['disc_losses'],
+                            title='Discriminator Loss',
+                            xlabel='Epoch',
+                            ylabel='Loss',
+                            save_path=disc_path)
 
     # plot and save generator loss
     gen_path = os.path.join(metrics_path, 'gen_loss')
-    ut.save_figure(metrics['gen_losses'],
-                   title='Generator Loss',
-                   xlabel='Epoch',
-                   ylabel='Loss',
-                   save_path=gen_path)
+    utils.create_line_graph(metrics['gen_losses'],
+                            title='Generator Loss',
+                            xlabel='Epoch',
+                            ylabel='Loss',
+                            save_path=gen_path)
 
     # compare discriminator and generator loss
     disc_gen_path = os.path.join(metrics_path, 'disc_gen_loss')
-    ut.save_figure(metrics['disc_losses'],
-                   metrics['gen_losses'],
-                   title='Discriminator and Generator Loss',
-                   xlabel='Epoch',
-                   ylabel='Loss',
-                   save_path=disc_gen_path)
+    utils.create_line_graph(metrics['disc_losses'],
+                            metrics['gen_losses'],
+                            title='Discriminator and Generator Loss',
+                            xlabel='Epoch',
+                            ylabel='Loss',
+                            save_path=disc_gen_path)
 
     # plot and save L1 loss
     l1_path = os.path.join(metrics_path, 'l1_loss')
-    ut.save_figure(metrics['custom_loss_losses'],
-                   title='Combined L1/Intensity Awareness Loss',
-                   xlabel='Epoch',
-                   ylabel='Loss',
-                   save_path=l1_path)
+    utils.create_line_graph(metrics['custom_loss_losses'],
+                            title='Combined L1/Intensity Awareness Loss',
+                            xlabel='Epoch',
+                            ylabel='Loss',
+                            save_path=l1_path)
 
     psnr_path = os.path.join(metrics_path, 'psnr')
-    ut.save_figure(metrics['avg_psnrs'],
-                   title='Average PSNR (validation data)',
-                   xlabel='Epoch',
-                   ylabel='PSNR',
-                   save_path=psnr_path)
+    utils.create_line_graph(metrics['avg_psnrs'],
+                            title='Average PSNR (validation data)',
+                            xlabel='Epoch',
+                            ylabel='PSNR',
+                            save_path=psnr_path)
 
     ssim_path = os.path.join(metrics_path, 'ssim')
-    ut.save_figure(metrics['avg_ssims'],
-                   title='Average SSIM (validation data)',
-                   xlabel='Epoch',
-                   ylabel='SSIM',
-                   save_path=ssim_path)
+    utils.create_line_graph(metrics['avg_ssims'],
+                            title='Average SSIM (validation data)',
+                            xlabel='Epoch',
+                            ylabel='SSIM',
+                            save_path=ssim_path)
 
     # save all metrics for inspection and clarity
     with open(os.path.join(metrics_path, 'metrics.json'), 'w') as f:

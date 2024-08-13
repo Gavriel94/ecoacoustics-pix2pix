@@ -49,28 +49,34 @@ def test_model(dataloader, generator, device, save_dir, run_num):
                 img_dir = os.path.join(eval_dir, 'images')
                 os.makedirs(img_dir, exist_ok=True)
                 # crop images
-                gen_cropped = utils.remove_padding(gen_spec[batch_idx], original_size,
-                                                   padding_coords, is_target=False)
-                target_cropped = utils.remove_padding(target_img[batch_idx], original_size,
-                                                      padding_coords, is_target=True)
-
+                gen_cropped = utils.remove_padding_from_tensor(gen_spec[batch_idx],
+                                                               original_size,
+                                                               padding_coords,
+                                                               is_target=False)
+                target_cropped = utils.remove_padding_from_tensor(target_img[batch_idx],
+                                                                  original_size,
+                                                                  padding_coords,
+                                                                  is_target=True)
+                # compute psnr and ssim
                 avg_psnr += psnr(gen_cropped.unsqueeze(0), target_cropped.unsqueeze(0))
                 avg_ssim += ssim(gen_cropped.unsqueeze(0), target_cropped.unsqueeze(0))
 
+                # save target tensor
                 target_save = os.path.join(img_dir, f'b{idx}i{batch_idx}_t_{img_names[batch_idx]}')
                 utils.save_tensor_as_img(target_cropped, target_save)
 
+                # convert generated tensor to image
                 gen_img = utils.convert_tensor_to_img(gen_cropped)
                 img_save_path = os.path.join(img_dir, f'b{idx}i{batch_idx}_g_{img_names[batch_idx]}')
-                print(img_save_path)
-                gen_img.save(img_save_path)  # save using PIL to keep gen_img in memory
+                # save using PIL and keep generated img in memory
+                gen_img.save(img_save_path)
 
                 # create audio from spectrograms and save
                 audio_dir = os.path.join(eval_dir, 'audio')
                 os.makedirs(audio_dir, exist_ok=True)
-                save_path = os.path.join(audio_dir, img_names[batch_idx])  # filename with .png ext
+                save_path = os.path.join(audio_dir, img_names[batch_idx])  # filename has .png ext
                 try:
-                    gen_audio = utils.spectrogram_to_audio(gen_img, param_dicts[batch_idx], save_path, 48000)
+                    utils.spectrogram_to_audio(gen_img, param_dicts[batch_idx], save_path, 48000)
                 except json.decoder.JSONDecodeError as e:
                     print(f'Error opening {param_dicts[batch_idx]}, {str(e)}')
             num_batches += 1
@@ -79,6 +85,23 @@ def test_model(dataloader, generator, device, save_dir, run_num):
         avg_ssim = avg_ssim / num_batches
         metrics['avg_psnr'].append(avg_psnr)
         metrics['avg_ssim'].append(avg_ssim)
+
+        graph_dir = os.path.join(eval_dir, 'metrics')
+        os.makedirs(graph_dir, exist_ok=True)
+
+        psnr_path = os.path.join(graph_dir, 'psnr')
+        utils.create_line_graph(metrics['avg_psnrs'],
+                                title='Average PSNR',
+                                xlabel='Epoch',
+                                ylabel='PSNR',
+                                save_path=psnr_path)
+
+        ssim_path = os.path.join(graph_dir, 'ssim')
+        utils.create_line_graph(metrics['avg_ssims'],
+                                title='Average SSIM',
+                                xlabel='Epoch',
+                                ylabel='SSIM',
+                                save_path=ssim_path)
     return metrics
 
 
