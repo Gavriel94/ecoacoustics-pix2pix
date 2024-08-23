@@ -1,0 +1,8 @@
+numpy
+matplotlib
+pandas
+librosa
+soundfile
+Pillow
+scipy
+logger

@@ -1,0 +1,17 @@
+.vscode
+.venv
+.pytest_cache
+docs
+raw_data
+.DS_Store
+__pychache__
+*.pyc
+data
+backups
+tmp
+pix2pix/evaluation
+raw_data_mini
+data_test/
+Acoustic_Indices/
+full_data/
+results/

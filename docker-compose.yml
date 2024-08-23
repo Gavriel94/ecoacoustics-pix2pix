@@ -1,0 +1,27 @@
+services:
+  test:
+    command: bash -c "flake8 . --count --exit-zero --statistics --select=E9,F63,F7,F82,E1,E2,E3,W1,W3 && pytest"
+    image: mic_inf:latest
+    volumes: 
+    - .:/app
+
+  script:
+    build: .
+    command: python /app/script.py
+    image: mic_inf:latest
+    volumes:
+      - .:/app
+
+  analysis:
+      build: .
+      command: python /app/audio_analysis.py
+      image: mic_inf:latest
+      volumes:
+        - .:/app
+  
+  dataset:
+      build: .
+      command: python /app/dataset.py
+      image: mic_inf:latest
+      volumes:
+        - .:/app
