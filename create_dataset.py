@@ -57,11 +57,11 @@ The folder contains
     - This JSON file shows the view of the data this module uses.
 """
 
+import gzip
 import json
 import os
 import platform
 import random
-import gzip
 
 import librosa
 import numpy as np

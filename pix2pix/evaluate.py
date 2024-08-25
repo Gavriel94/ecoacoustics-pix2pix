@@ -2,15 +2,17 @@
 Test the spectrogram translation conditional Generative Adversial Network.
 """
 
-import os
 import json
-from tqdm import tqdm
-import config
-from . import model_utils as utils
+import os
 
 import torch
 from torchmetrics.image import (PeakSignalNoiseRatio,
                                 StructuralSimilarityIndexMeasure)
+from tqdm import tqdm
+
+import config
+
+from . import model_utils as utils
 
 
 def test_model(dataloader, generator, run_num):

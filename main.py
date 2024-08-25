@@ -2,8 +2,8 @@ import os
 
 import config
 import create_dataset
-import test_model
 import train_model
+import evaluate_model
 
 
 def main():
@@ -11,7 +11,7 @@ def main():
         create_dataset.main()
 
     train_model.main()
-    test_model.main()
+    evaluate_model.main()
 
 
 if __name__ == '__main__':

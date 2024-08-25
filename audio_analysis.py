@@ -11,12 +11,13 @@ These metrics help accurate recomposition of audio from spectrograms
 and promote a better understanding of the data before any engineering.
 """
 
-import wave
 import os
-import pandas as pd
-from scipy.io.wavfile import read
+import wave
+
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+from scipy.io.wavfile import read
 
 import config
 

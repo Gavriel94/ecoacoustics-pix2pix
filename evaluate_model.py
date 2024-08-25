@@ -15,14 +15,13 @@ from torch.utils.data import DataLoader
 
 import config
 import pix2pix.model_utils as m_utils
-from Acoustic_Indices.main_compute_indices_from_dir import compute_indices
 import utilities as utils
-from pix2pix.dataset_eval import Pix2PixEvaluationDataset
-from pix2pix.generator_transpose_conv import Generator as GenRegTranspose
-from pix2pix.generator_regular_conv import Generator as GenRegConv
-from pix2pix.evaluate import test_model
+from Acoustic_Indices.main_compute_indices_from_dir import compute_indices
 from pix2pix.birdnet_eval import birdnet_analysis
-
+from pix2pix.dataset_eval import Pix2PixEvaluationDataset
+from pix2pix.evaluate import test_model
+from pix2pix.generator_regular_conv import Generator as GenRegConv
+from pix2pix.generator_transpose_conv import Generator as GenRegTranspose
 
 # * ensure hyperparameters match ones used during training
 

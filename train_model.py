@@ -19,8 +19,8 @@ import config
 import pix2pix.model_utils as m_utils
 from pix2pix.dataset_train import Pix2PixTrainingDataset
 from pix2pix.discriminator import Discriminator
-from pix2pix.generator_transpose_conv import Generator as GenRegTranspose
 from pix2pix.generator_regular_conv import Generator as GenRegConv
+from pix2pix.generator_transpose_conv import Generator as GenRegTranspose
 from pix2pix.train import train_cGAN
 
 
