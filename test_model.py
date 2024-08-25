@@ -20,7 +20,7 @@ import utilities as utils
 from pix2pix.dataset_eval import Pix2PixEvaluationDataset
 from pix2pix.generator_transpose_conv import Generator as GenRegTranspose
 from pix2pix.generator_regular_conv import Generator as GenRegConv
-from pix2pix.test_cGAN import test_model
+from pix2pix.evaluate import test_model
 from pix2pix.birdnet_eval import birdnet_analysis
 
 
@@ -37,7 +37,7 @@ def main():
     utils.remove_hidden_files(config.DATASET_ROOT)
 
     test_dataset = Pix2PixEvaluationDataset(dataset=os.path.join(config.DATASET_ROOT, 'test'),
-                                      use_correlated=False)
+                                            use_correlated=False)
 
     test_loader = DataLoader(test_dataset,
                              batch_size=config.BATCH_SIZE,
