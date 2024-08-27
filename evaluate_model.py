@@ -25,9 +25,11 @@ from pix2pix.generator_transpose_conv import Generator as GenRegTranspose
 
 # * ensure hyperparameters match ones used during training
 
+
 def main():
-    # which training run to evaluate
-    run_num = 8  # ! increment this !
+    # evaluate data in data/train_runs/run_num
+    run_num = 9
+
     eval_dir = os.path.join(config.DATASET_ROOT, 'evaluation', f'run_{run_num}')
     os.makedirs(eval_dir, exist_ok=False)
 
@@ -46,7 +48,7 @@ def main():
 
     generator_path = os.path.join(config.DATASET_ROOT, 'train_runs',
                                   f'run_{run_num}', 'model', 'generator.pth')
-    gen = GenRegConv(in_ch=1, features=64).to(config.DEVICE)
+    gen = GenRegTranspose(in_ch=1, features=64).to(config.DEVICE)
     gen.load_state_dict(torch.load(generator_path, weights_only=False))
 
     # test model

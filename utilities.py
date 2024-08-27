@@ -108,12 +108,12 @@ def train_val_test_split(data: list, split_percent: float, shuffle=True):
     return train, val, test
 
 
-def get_raw_audio(audio_filename: str):
+def get_raw_audio(audio_filename: str | list):
     """
-    Find the full path to a raw audio file using an audio filename.
+    Find the full path to raw audio file(s) using an audio filename(s).
 
     Args:
-        audio_filename (str): basename of an audio file.
+        audio_filename (str | list): basename(s) of audio file(s).
     """
     def get_audio(sample):
         # key which is just file basename without ext

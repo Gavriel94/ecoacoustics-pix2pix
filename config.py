@@ -14,13 +14,13 @@ cGAN variables
 # Tunable parameters
 LEARNING_RATE = 2e-4
 NUM_EPOCHS = 5
-L1_LAMBDA = 800  # contribution of custom loss to total Generator loss
+L1_LAMBDA = 200  # contribution of custom loss to total Generator loss
 
 CUSTOM_LOSS = Pix2PixL1IntensityLoss(alpha=0.8)
 # CUSTOM_LOSS = Pix2PixL1IntensityLoss()
 
 # this emulates a batch of size (ACCUMULATION_STEPS * BATCH_SIZE)
-ACCUMULATION_STEPS = 8  # number of steps before parameters update
+ACCUMULATION_STEPS = 4  # number of steps before parameters update
 
 """
 Dataset variables

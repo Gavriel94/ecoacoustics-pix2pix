@@ -19,7 +19,7 @@ from . import model_utils as utils
 def train_cGAN(discriminator, generator,
                train_loader, validation_loader,
                optim_discriminator, optim_generator,
-               custom_loss, loss_lambda,
+               custom_loss_func, loss_lambda,
                bce_logits, num_epochs,
                device, save_dir,
                accumulation_steps):
@@ -98,8 +98,8 @@ def train_cGAN(discriminator, generator,
             # * train generator
             D_fake, fake_features = discriminator(input_img, generated_img)
             G_fake_loss = bce_logits(D_fake, torch.ones_like(D_fake))  # BCE for synth images
-            l1_intensity_aware_loss = custom_loss(generated_img, target_img) * loss_lambda
-            G_loss = G_fake_loss + l1_intensity_aware_loss
+            custom_loss = custom_loss_func(generated_img, target_img) * loss_lambda
+            G_loss = G_fake_loss + custom_loss
             # backpropagate and update generator weights
             G_loss_norm = G_loss / accumulation_steps
             G_loss_norm.backward()
@@ -108,13 +108,13 @@ def train_cGAN(discriminator, generator,
             data_loader_tqdm.set_postfix({
                 'D_loss': D_loss.item(),
                 'G_loss': G_loss.item(),
-                'Loss': l1_intensity_aware_loss.item()
+                'Loss': custom_loss.item()
             })
 
             # save metrics
             metrics['disc_losses'].append(D_loss.item())
             metrics['gen_losses'].append(G_loss.item())
-            metrics['custom_loss_losses'].append(l1_intensity_aware_loss.item())
+            metrics['custom_loss_losses'].append(custom_loss.item())
 
             # update weights with accumulated gradients
             if (idx + 1) % accumulation_steps == 0:
