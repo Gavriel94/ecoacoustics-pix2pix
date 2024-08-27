@@ -1,8 +1,12 @@
-numpy
-matplotlib
-pandas
+birdnetlib
 librosa
-soundfile
+matplotlib
+numpy
+pandas
 Pillow
 scipy
-logger
+soundfile
+torch
+torchmetrics
+torchvision
+tqdm

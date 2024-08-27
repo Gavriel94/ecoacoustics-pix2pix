@@ -22,7 +22,7 @@ raw_data/
         └── location2/
 ```
 
-Running the main script will create the dataset, train the model and run the evaluation pipeline automatically. 
+Running the main script will create the dataset, train the model and run the evaluation pipeline automatically.
 
 Hyperparameters are easily modified from the configuration file.
 
