@@ -32,7 +32,7 @@ They are generated using filenames which must be formatted as `LOCATION_YYYYMMDD
 Recordings from the target microphone must include a delimiter so generated and target audio can be matched later,
 for example input from the SMMicro has the filename `PLI1_20231104_125433.wav`. The target microphone, SM4, has a name with the delimiter `-4` included: `PLI1-4_20231104_125433.wav`.
 
-Full summary files should be kept in a folder `full_summaries` just under the parent directory. This allows the evaluation steps to find the latitude and longitude of each recording, and allows extensibility in the future - if more columns are added, more analysis can be done.
+Full summary files for each location should contain at least the latitude, longitude, date and time of each recording, and be kept in a folder `full_summaries` just under the parent directory. This allows the evaluation steps to find the latitude and longitude of each recording, and allows extensibility in the future - if more columns are added, more analysis can be done.
 
 The output will be some audio analysis, the generated summary folders, a JSON file displaying the directories used and how they're organised, and a train/val/test set with the % of training data defined in the configuration file. The test data folder also includes a params directory, that has magnitude and phase information, along with some other values, that'll influence how audio is recomposed.
 
